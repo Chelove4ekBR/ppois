@@ -1,0 +1,18 @@
+digraph "build/CMakeFiles"
+{
+ // LATEX_PDF_SIZE
+  bgcolor="transparent";
+  edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
+  node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
+  compound=true
+  subgraph clusterdir_4fef79e7177ba769987a8da36c892c5f {
+    graph [ bgcolor="#edf0f7", pencolor="grey25", label="build", fontname=Helvetica,fontsize=10 style="filled,dashed", URL="dir_4fef79e7177ba769987a8da36c892c5f.html",tooltip=""]
+  subgraph clusterdir_63772b626f2709090f0bdca0f40827b4 {
+    graph [ bgcolor="#edf0f7", pencolor="grey25", label="", fontname=Helvetica,fontsize=10 style="filled,bold", URL="dir_63772b626f2709090f0bdca0f40827b4.html",tooltip=""]
+    dir_63772b626f2709090f0bdca0f40827b4 [shape=plaintext, label="CMakeFiles"];
+  dir_5cefb66a2b3927b099ebe0b9254f9408 [label="3.31.6", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_5cefb66a2b3927b099ebe0b9254f9408.html",tooltip=""];
+  dir_90a3d0b9476532c2b8e703b1d28c1b3f [label="matrix.dir", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_90a3d0b9476532c2b8e703b1d28c1b3f.html",tooltip=""];
+  dir_409c106ac5e043f7e0729e49ae62bfb5 [label="unit_tests_matr.dir", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_409c106ac5e043f7e0729e49ae62bfb5.html",tooltip=""];
+  }
+  }
+}
