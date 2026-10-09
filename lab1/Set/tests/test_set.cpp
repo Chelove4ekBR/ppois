@@ -1,37 +1,43 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_test_macros.hpp>
 
-#include "../src/Set.h"
+#include "../include/Set.h"
 #include <sstream>
 
-TEST_CASE("Element: конструкторы, сравнение и преобразование в строку", "[Element]")
+TEST_CASE("Node: конструкторы, сравнение и преобразование в строку", "[Node]")
 {
-    Set::Element atom_a("a");
-    Set::Element atom_b("b");
-    Set::Element atom_a_copy("a");
+    Set::Node atom_a("a");
+    Set::Node atom_b("b");
+    Set::Node atom_a_copy("a");
 
     SECTION("Атомы: равенство и неравенство")
     {
         REQUIRE(atom_a == atom_a_copy);
         REQUIRE(atom_a != atom_b);
         REQUIRE(atom_a.to_string() == "a");
+        REQUIRE_FALSE(atom_a.is_set_node());
+        REQUIRE(atom_a.get_atom() == "a");
     }
 
     SECTION("Вложенные множества: равенство и вывод")
     {
-        Set::Element nested1(std::vector<Set::Element>{atom_a, atom_b});
-        Set::Element nested2(std::vector<Set::Element>{atom_a, atom_b});
-        Set::Element empty_nested(std::vector<Set::Element>{});
+        Set::Node nested1(std::vector<Set::Node>{atom_a, atom_b});
+        Set::Node nested2(std::vector<Set::Node>{atom_a, atom_b});
+        Set::Node empty_nested(std::vector<Set::Node>{});
 
         REQUIRE(nested1 == nested2);
         REQUIRE(nested1 != empty_nested);
         REQUIRE(nested1.to_string() == "{a, b}");
         REQUIRE(empty_nested.to_string() == "{}");
+        REQUIRE(nested1.is_set_node());
+        REQUIRE(nested1.get_children().size() == 2);
+        REQUIRE(empty_nested.is_set_node());
+        REQUIRE(empty_nested.get_children().empty());
     }
 
     SECTION("Оператор < (порядок сортировки элементов)")
     {
-        Set::Element nested(std::vector<Set::Element>{atom_a});
+        Set::Node nested(std::vector<Set::Node>{atom_a});
 
         REQUIRE(atom_a < nested);
         REQUIRE_FALSE(nested < atom_a);
@@ -53,14 +59,14 @@ TEST_CASE("Set: базовые методы и состояние", "[Set]")
 
     SECTION("Добавление элементов и изменение размера")
     {
-        s.add(Set::Element("x"));
+        s.add(Set::Node("x"));
         REQUIRE_FALSE(s.empty());
         REQUIRE(s.size() == 1);
     }
 
     SECTION("Очистка множества")
     {
-        s.add(Set::Element("x"));
+        s.add(Set::Node("x"));
         s.clear();
         REQUIRE(s.empty());
         REQUIRE(s.size() == 0);
@@ -70,8 +76,8 @@ TEST_CASE("Set: базовые методы и состояние", "[Set]")
 TEST_CASE("Set: добавление, удаление и индексация []", "[Set]")
 {
     Set s;
-    Set::Element elem_a("a");
-    Set::Element elem_b("b");
+    Set::Node elem_a("a");
+    Set::Node elem_b("b");
 
     SECTION("Добавление элементов и предотвращение дубликатов")
     {
@@ -112,8 +118,8 @@ TEST_CASE("Set: алгебраические операции", "[Set]")
         temp += B;
         REQUIRE(temp == union_set);
 
-        temp += Set::Element("e");
-        REQUIRE(temp.contains(Set::Element("e")));
+        temp += Set::Node("e");
+        REQUIRE(temp.contains(Set::Node("e")));
     }
 
     SECTION("Пересечение (* и *=)")
@@ -135,7 +141,7 @@ TEST_CASE("Set: алгебраические операции", "[Set]")
         temp -= B;
         REQUIRE(temp == diff_set);
 
-        temp -= Set::Element("a");
+        temp -= Set::Node("a");
         REQUIRE(temp.empty());
     }
 }
@@ -156,10 +162,10 @@ TEST_CASE("Set: построение булеана (power_set)", "[Set]")
         Set P = s.power_set();
 
         REQUIRE(P.size() == 4);
-        REQUIRE(P.contains(Set::parse_element("{}")));
-        REQUIRE(P.contains(Set::parse_element("{a}")));
-        REQUIRE(P.contains(Set::parse_element("{b}")));
-        REQUIRE(P.contains(Set::parse_element("{a, b}")));
+        REQUIRE(P.contains(Set::parse_Node("{}")));
+        REQUIRE(P.contains(Set::parse_Node("{a}")));
+        REQUIRE(P.contains(Set::parse_Node("{b}")));
+        REQUIRE(P.contains(Set::parse_Node("{a, b}")));
     }
 }
 
@@ -171,7 +177,6 @@ TEST_CASE("Set: парсинг и нормализация", "[Set]")
         Set s = Set::parse(str);
 
         REQUIRE(s.size() == 6);
-
         REQUIRE(s.to_string() == "{a, b, c, {}, {a, b}, {a, {c}}}");
     }
 
@@ -179,19 +184,19 @@ TEST_CASE("Set: парсинг и нормализация", "[Set]")
     {
         Set s = Set::parse("{   x ,   { y,  z }  }");
         REQUIRE(s.size() == 2);
-        REQUIRE(s.contains(Set::Element("x")));
-        REQUIRE(s.contains(Set::parse_element("{y, z}")));
+        REQUIRE(s.contains(Set::Node("x")));
+        REQUIRE(s.contains(Set::parse_Node("{y, z}")));
     }
 
-    SECTION("Парсинг отдельных элементов (parse_element)")
+    SECTION("Парсинг отдельных элементов (parse_Node)")
     {
-        Set::Element elem_atom = Set::parse_element("  val  ");
-        REQUIRE_FALSE(elem_atom.is_set);
-        REQUIRE(elem_atom.atom == "val");
+        Set::Node elem_atom = Set::parse_Node("  val  ");
+        REQUIRE_FALSE(elem_atom.is_set_node());
+        REQUIRE(elem_atom.get_atom() == "val");
 
-        Set::Element elem_set = Set::parse_element(" {1, 2} ");
-        REQUIRE(elem_set.is_set);
-        REQUIRE(elem_set.children.size() == 2);
+        Set::Node elem_set = Set::parse_Node(" {1, 2} ");
+        REQUIRE(elem_set.is_set_node());
+        REQUIRE(elem_set.get_children().size() == 2);
     }
 }
 
@@ -212,7 +217,7 @@ TEST_CASE("Set: работа с потоками ввода-вывода", "[Set
         ss >> s;
 
         REQUIRE(s.size() == 3);
-        REQUIRE(s.contains(Set::Element("x")));
-        REQUIRE(s.contains(Set::parse_element("{z}")));
+        REQUIRE(s.contains(Set::Node("x")));
+        REQUIRE(s.contains(Set::parse_Node("{z}")));
     }
 }

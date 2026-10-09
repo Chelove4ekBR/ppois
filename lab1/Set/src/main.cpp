@@ -1,11 +1,10 @@
 #include <iostream>
 #include <string>
-#include "Set.h"
+#include "../include/Set.h"
 
 void print_menu()
 {
-    std::cout << "\n=== МЕНЮ (Теория множеств) ===\n"
-              << "1.  Ввести множество A (например, {a, b, c, {a, b}, {}, {a, {c}}})\n"
+    std::cout << "1.  Ввести множество A (например, {a, b, c, {a, b}, {}, {a, {c}}})\n"
               << "2.  Ввести множество B\n"
               << "3.  Показать множества A и B\n"
               << "4.  Проверить A на пустоту\n"
@@ -33,7 +32,7 @@ int main()
         if (!(std::cin >> choice) || choice == 0)
             break;
 
-        std::cin.ignore(10000, '\n'); // Очистка буфера ввода
+        std::cin.ignore(10000, '\n');
 
         switch (choice)
         {
@@ -76,7 +75,7 @@ int main()
             std::cout << "Введите элемент для добавления (атом 'x' или множество '{x, y}'): ";
             std::string input;
             std::getline(std::cin, input);
-            Set::Element elem = Set::parse_element(input);
+            Set::Node elem = Set::parse_Node(input);
             if (A.add(elem))
                 std::cout << "Элемент добавлен. A = " << A << "\n";
             else
@@ -88,7 +87,7 @@ int main()
             std::cout << "Введите элемент для удаления: ";
             std::string input;
             std::getline(std::cin, input);
-            Set::Element elem = Set::parse_element(input);
+            Set::Node elem = Set::parse_Node(input);
             if (A.remove(elem))
                 std::cout << "Элемент удален. A = " << A << "\n";
             else
@@ -100,7 +99,7 @@ int main()
             std::cout << "Введите элемент для проверки: ";
             std::string input;
             std::getline(std::cin, input);
-            Set::Element elem = Set::parse_element(input);
+            Set::Node elem = Set::parse_Node(input);
             if (A[elem])
                 std::cout << "Элемент ПРИНАДЛЕЖИТ множеству A.\n";
             else

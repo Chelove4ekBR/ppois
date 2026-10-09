@@ -1,15 +1,30 @@
-#include "Set.h"
+#include "../include/Set.h"
 
-Set::Element::Element()
+Set::Node::Node()
     : is_set(false) {}
 
-Set::Element::Element(const std::string &atom_val)
+Set::Node::Node(const std::string &atom_val)
     : is_set(false), atom(atom_val) {}
 
-Set::Element::Element(const std::vector<Element> &children_val)
+Set::Node::Node(const std::vector<Node> &children_val)
     : is_set(true), children(children_val) {}
 
-bool Set::Element::operator==(const Element &other) const
+bool Set::Node::is_set_node() const
+{
+    return is_set;
+}
+
+const std::string &Set::Node::get_atom() const
+{
+    return atom;
+}
+
+const std::vector<Set::Node> &Set::Node::get_children() const
+{
+    return children;
+}
+
+bool Set::Node::operator==(const Node &other) const
 {
     if (is_set != other.is_set)
         return false;
@@ -18,12 +33,12 @@ bool Set::Element::operator==(const Element &other) const
     return children == other.children;
 }
 
-bool Set::Element::operator!=(const Element &other) const
+bool Set::Node::operator!=(const Node &other) const
 {
     return !(*this == other);
 }
 
-bool Set::Element::operator<(const Element &other) const
+bool Set::Node::operator<(const Node &other) const
 {
 
     if (is_set != other.is_set)
@@ -35,7 +50,7 @@ bool Set::Element::operator<(const Element &other) const
     return children < other.children;
 }
 
-std::string Set::Element::to_string() const
+std::string Set::Node::to_string() const
 {
     if (!is_set)
         return atom;
@@ -53,8 +68,8 @@ std::string Set::Element::to_string() const
 
 Set::Set() {}
 
-Set::Set(const std::vector<Element> &elems)
-    : elements(elems)
+Set::Set(const std::vector<Node> &elems)
+    : Nodes(elems)
 {
     normalize();
 }
@@ -62,133 +77,110 @@ Set::Set(const std::vector<Element> &elems)
 void Set::normalize()
 {
 
-    for (auto &item : elements)
+    for (auto &item : Nodes)
     {
         if (item.is_set)
         {
             Set temp(item.children);
             temp.normalize();
-            item.children = temp.elements;
+            item.children = temp.Nodes;
         }
     }
 
-    for (size_t i = 0; i < elements.size(); i++)
-    {
-        for (size_t j = i + 1; j < elements.size(); j++)
-        {
-            if (elements[j] < elements[i])
-            {
-                Element temp = elements[i];
-                elements[i] = elements[j];
-                elements[j] = temp;
-            }
-        }
-    }
+    std::sort(Nodes.begin(), Nodes.end());
 
-    std::vector<Element> unique_elems;
-    for (const auto &item : elements)
-    {
-        if (unique_elems.empty() || unique_elems.back() != item)
-        {
-            unique_elems.push_back(item);
-        }
-    }
-    elements = unique_elems;
+    auto it = std::unique(Nodes.begin(), Nodes.end());
+    Nodes.erase(it, Nodes.end());
 }
 
 bool Set::empty() const
 {
-    return elements.empty();
+    return Nodes.empty();
 }
 
 int Set::size() const
 {
-    return static_cast<int>(elements.size());
+    return static_cast<int>(Nodes.size());
 }
 
 void Set::clear()
 {
-    elements.clear();
+    Nodes.clear();
 }
 
-bool Set::contains(const Element &elem) const
+bool Set::contains(const Node &elem) const
 {
-    Element normalized = elem;
+    Node normalized = elem;
     if (normalized.is_set)
     {
         Set temp(normalized.children);
         temp.normalize();
-        normalized.children = temp.elements;
+        normalized.children = temp.Nodes;
     }
 
-    for (const auto &item : elements)
-    {
-        if (item == normalized)
-            return true;
-    }
-    return false;
+    return std::binary_search(Nodes.begin(), Nodes.end(), normalized);
 }
 
-bool Set::add(const Element &elem)
+bool Set::add(const Node &elem)
 {
-    Element normalized = elem;
+    Node normalized = elem;
     if (normalized.is_set)
     {
         Set temp(normalized.children);
         temp.normalize();
-        normalized.children = temp.elements;
+        normalized.children = temp.Nodes;
     }
 
     if (contains(normalized))
         return false;
 
-    elements.push_back(normalized);
+    Nodes.push_back(normalized);
     normalize();
     return true;
 }
 
-bool Set::remove(const Element &elem)
+bool Set::remove(const Node &elem)
 {
-    Element normalized = elem;
+    Node normalized = elem;
     if (normalized.is_set)
     {
         Set temp(normalized.children);
         temp.normalize();
-        normalized.children = temp.elements;
+        normalized.children = temp.Nodes;
     }
 
-    for (size_t i = 0; i < elements.size(); i++)
+    auto it = std::find(Nodes.begin(), Nodes.end(), normalized);
+    if (it != Nodes.end())
     {
-        if (elements[i] == normalized)
-        {
-            elements.erase(elements.begin() + i);
-            return true;
-        }
+        Nodes.erase(it);
+        return true;
     }
     return false;
 }
 
-bool Set::operator[](const Element &elem) const
+bool Set::operator[](const Node &elem) const
 {
     return contains(elem);
 }
 
 Set Set::operator+(const Set &other) const
 {
-    Set res = *this;
-    for (const auto &item : other.elements)
-        res.add(item);
+    Set res;
+    std::set_union(
+        Nodes.begin(), Nodes.end(),
+        other.Nodes.begin(), other.Nodes.end(),
+        std::back_inserter(res.Nodes));
     return res;
 }
 
 Set &Set::operator+=(const Set &other)
 {
-    for (const auto &item : other.elements)
+    for (const auto &item : other.Nodes)
         add(item);
     return *this;
 }
 
-Set &Set::operator+=(const Element &elem)
+Set &Set::operator+=(const Node &elem)
 {
     add(elem);
     return *this;
@@ -197,11 +189,10 @@ Set &Set::operator+=(const Element &elem)
 Set Set::operator*(const Set &other) const
 {
     Set res;
-    for (const auto &item : elements)
-    {
-        if (other.contains(item))
-            res.add(item);
-    }
+    std::set_intersection(
+        Nodes.begin(), Nodes.end(),
+        other.Nodes.begin(), other.Nodes.end(),
+        std::back_inserter(res.Nodes));
     return res;
 }
 
@@ -214,11 +205,10 @@ Set &Set::operator*=(const Set &other)
 Set Set::operator-(const Set &other) const
 {
     Set res;
-    for (const auto &item : elements)
-    {
-        if (!other.contains(item))
-            res.add(item);
-    }
+    std::set_difference(
+        Nodes.begin(), Nodes.end(),
+        other.Nodes.begin(), other.Nodes.end(),
+        std::back_inserter(res.Nodes));
     return res;
 }
 
@@ -228,7 +218,7 @@ Set &Set::operator-=(const Set &other)
     return *this;
 }
 
-Set &Set::operator-=(const Element &elem)
+Set &Set::operator-=(const Node &elem)
 {
     remove(elem);
     return *this;
@@ -237,26 +227,35 @@ Set &Set::operator-=(const Element &elem)
 Set Set::power_set() const
 {
     Set res;
-    size_t n = elements.size();
-    size_t total = 1ULL << n;
 
-    for (size_t mask = 0; mask < total; mask++)
+    Node empty_subset;
+    empty_subset.is_set = true;
+    res.Nodes.push_back(empty_subset);
+
+    size_t total_subsets = static_cast<size_t>(std::pow(2, Nodes.size()));
+    res.Nodes.reserve(total_subsets);
+
+    for (const auto &item : Nodes)
     {
-        Element subset_elem;
-        subset_elem.is_set = true;
-        for (size_t i = 0; i < n; i++)
+        size_t current_size = res.Nodes.size();
+
+        for (size_t i = 0; i < current_size; ++i)
         {
-            if (mask & (1ULL << i))
-                subset_elem.children.push_back(elements[i]);
+            Node new_subset = res.Nodes[i];
+
+            new_subset.children.push_back(item);
+
+            res.Nodes.push_back(new_subset);
         }
-        res.add(subset_elem);
     }
+
+    res.normalize();
     return res;
 }
 
 bool Set::operator==(const Set &other) const
 {
-    return elements == other.elements;
+    return Nodes == other.Nodes;
 }
 
 bool Set::operator!=(const Set &other) const
@@ -267,28 +266,28 @@ bool Set::operator!=(const Set &other) const
 std::string Set::to_string() const
 {
     std::string res = "{";
-    for (size_t i = 0; i < elements.size(); i++)
+    for (size_t i = 0; i < Nodes.size(); i++)
     {
         if (i > 0)
             res += ", ";
-        res += elements[i].to_string();
+        res += Nodes[i].to_string();
     }
     res += "}";
     return res;
 }
 
-Set::Element Set::parse_element_recursive(const std::string &str, size_t &pos)
+Set::Node Set::parse_Node_recursive(const std::string &str, size_t &pos)
 {
     while (pos < str.length() && isspace(static_cast<unsigned char>(str[pos])))
         pos++;
 
     if (pos >= str.length())
-        return Element();
+        return Node();
 
     if (str[pos] == '{')
     {
         pos++;
-        Element e;
+        Node e;
         e.is_set = true;
 
         while (pos < str.length())
@@ -302,7 +301,7 @@ Set::Element Set::parse_element_recursive(const std::string &str, size_t &pos)
                 break;
             }
 
-            e.children.push_back(parse_element_recursive(str, pos));
+            e.children.push_back(parse_Node_recursive(str, pos));
 
             while (pos < str.length() && isspace(static_cast<unsigned char>(str[pos])))
                 pos++;
@@ -326,7 +325,7 @@ Set::Element Set::parse_element_recursive(const std::string &str, size_t &pos)
         {
             pos++;
         }
-        return Element(str.substr(start, pos - start));
+        return Node(str.substr(start, pos - start));
     }
 }
 
@@ -339,10 +338,10 @@ Set Set::parse(const std::string &str)
     if (pos >= str.length())
         return Set();
 
-    Element root = parse_element_recursive(str, pos);
+    Node root = parse_Node_recursive(str, pos);
     Set s;
     if (root.is_set)
-        s.elements = root.children;
+        s.Nodes = root.children;
     else
         s.add(root);
 
@@ -350,21 +349,21 @@ Set Set::parse(const std::string &str)
     return s;
 }
 
-Set::Element Set::parse_element(const std::string &str)
+Set::Node Set::parse_Node(const std::string &str)
 {
     size_t pos = 0;
     while (pos < str.length() && isspace(static_cast<unsigned char>(str[pos])))
         pos++;
 
     if (pos >= str.length())
-        return Element();
+        return Node();
 
     if (str[pos] == '{')
     {
-        Element e = parse_element_recursive(str, pos);
+        Node e = parse_Node_recursive(str, pos);
         Set temp(e.children);
         temp.normalize();
-        e.children = temp.elements;
+        e.children = temp.Nodes;
         return e;
     }
     else
@@ -372,7 +371,7 @@ Set::Element Set::parse_element(const std::string &str)
         size_t end = str.length();
         while (end > pos && isspace(static_cast<unsigned char>(str[end - 1])))
             end--;
-        return Element(str.substr(pos, end - pos));
+        return Node(str.substr(pos, end - pos));
     }
 }
 
