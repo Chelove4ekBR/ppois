@@ -81,9 +81,9 @@ void Set::normalize()
     {
         if (item.is_set)
         {
-            Set temp(item.children);
-            temp.normalize();
-            item.children = temp.Nodes;
+            Set temporarySetForNorm(item.children);
+            temporarySetForNorm.normalize();
+            item.children = temporarySetForNorm.Nodes;
         }
     }
 
@@ -113,9 +113,9 @@ bool Set::contains(const Node &elem) const
     Node normalized = elem;
     if (normalized.is_set)
     {
-        Set temp(normalized.children);
-        temp.normalize();
-        normalized.children = temp.Nodes;
+        Set temporarySetForNorm(normalized.children);
+        temporarySetForNorm.normalize();
+        normalized.children = temporarySetForNorm.Nodes;
     }
 
     return std::binary_search(Nodes.begin(), Nodes.end(), normalized);
@@ -126,9 +126,9 @@ bool Set::add(const Node &elem)
     Node normalized = elem;
     if (normalized.is_set)
     {
-        Set temp(normalized.children);
-        temp.normalize();
-        normalized.children = temp.Nodes;
+        Set temporarySetForNorm(normalized.children);
+        temporarySetForNorm.normalize();
+        normalized.children = temporarySetForNorm.Nodes;
     }
 
     if (contains(normalized))
@@ -144,9 +144,9 @@ bool Set::remove(const Node &elem)
     Node normalized = elem;
     if (normalized.is_set)
     {
-        Set temp(normalized.children);
-        temp.normalize();
-        normalized.children = temp.Nodes;
+        Set temporarySetForNorm(normalized.children);
+        temporarySetForNorm.normalize();
+        normalized.children = temporarySetForNorm.Nodes;
     }
 
     auto it = std::find(Nodes.begin(), Nodes.end(), normalized);
@@ -361,9 +361,9 @@ Set::Node Set::parse_Node(const std::string &str)
     if (str[pos] == '{')
     {
         Node e = parse_Node_recursive(str, pos);
-        Set temp(e.children);
-        temp.normalize();
-        e.children = temp.Nodes;
+        Set temporarySetForNorm(e.children);
+        temporarySetForNorm.normalize();
+        e.children = temporarySetForNorm.Nodes;
         return e;
     }
     else
