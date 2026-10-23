@@ -5,12 +5,14 @@
 | Lab | Language | Contents                                                | Docs                                       |
 |-----|----------|---------------------------------------------------------|--------------------------------------------|
 | 1   | C++      | [Set](./lab1/Set), [Matrix](./lab1/Matrix)              | Doxygen, [Documentation](#documentation) |
+| 2   | C++      | [TravelAgency](./lab2)                                  | Doxygen, [Documentation](#documentation) |
 
 Each project has the same layout:
 
 ```
 include/   class declarations (.h)
-src/       class implementation and console menu (main.cpp)
+src/       class implementation (.cpp)
+sli/       console menu (main.cpp)
 tests/     unit tests (Catch2)
 ```
 
@@ -35,7 +37,7 @@ cmake --build build
 Code coverage (the CI requires at least 90% of lines in `src/`):
 
 ```bash
-gcovr --root . --filter 'src/' --exclude 'src/main.cpp'
+gcovr --root . --filter 'src/'
 ```
 
 ## Documentation
