@@ -2,7 +2,7 @@
 
 #include <utility>
 
-Visa::Visa(std::string country, std::string type, DateRange validity)
+Visa::Visa(std::string country, std::string type, const DateRange &validity)
     : country_(std::move(country)), type_(std::move(type)), validity_(validity) {}
 
 bool Visa::isActiveOn(const Date &date) const

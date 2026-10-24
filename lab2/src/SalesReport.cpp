@@ -6,7 +6,7 @@
 
 #include "Exceptions.hpp"
 
-SalesReport::SalesReport(std::string title, DateRange period) : title_(std::move(title)), period_(period) {}
+SalesReport::SalesReport(std::string title, const DateRange &period) : title_(std::move(title)), period_(period) {}
 
 bool SalesReport::add(const BookingPtr &booking)
 {
