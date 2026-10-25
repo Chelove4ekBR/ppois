@@ -6,7 +6,7 @@ using support::daysAfter;
 using support::usd;
 
 template <typename TourType>
-static std::shared_ptr<TourType> tourAt(TravelAgency &agency, std::size_t index)
+static std::shared_ptr<TourType> tourAt(TravelCompany &agency, std::size_t index)
 {
     return std::dynamic_pointer_cast<TourType>(agency.catalog().tours().at(index));
 }
@@ -50,7 +50,7 @@ TEST_CASE("Itinerary enforces day order and finds busiest day", "[tours]")
 
 TEST_CASE("BeachTour pricing", "[tours]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const auto beach = tourAt<BeachTour>(agency, 0);
     CHECK(beach->pricePerPerson().cents() == 85000);
     CHECK(beach->priceFor(2).cents() == 170000);
@@ -65,7 +65,7 @@ TEST_CASE("BeachTour pricing", "[tours]")
 
 TEST_CASE("ExcursionTour pricing", "[tours]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const auto excursion = tourAt<ExcursionTour>(agency, 1);
     CHECK(excursion->pricePerPerson().cents() == 31600);
     CHECK(excursion->guideSpeaksLanguage());
@@ -76,7 +76,7 @@ TEST_CASE("ExcursionTour pricing", "[tours]")
 
 TEST_CASE("CruiseTour cabin categories", "[tours]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const auto cruise = tourAt<CruiseTour>(agency, 2);
     CHECK(cruise->cabinMultiplierPercent() == 130);
     CHECK(cruise->pricePerPerson().cents() == 195000);
@@ -93,7 +93,7 @@ TEST_CASE("CruiseTour cabin categories", "[tours]")
 
 TEST_CASE("SkiTour pricing", "[tours]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const auto ski = tourAt<SkiTour>(agency, 3);
     CHECK(ski->skiPassCost().cents() == 24000);
     CHECK(ski->pricePerPerson().cents() == 94000);
@@ -104,7 +104,7 @@ TEST_CASE("SkiTour pricing", "[tours]")
 
 TEST_CASE("Tour constructor rejects non-positive values", "[tours]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const Tour base = *agency.catalog().tours().front();
     CHECK_THROWS_AS(Tour(9, "Bad", base.destination(), 0, usd(1), 5, base.itinerary()), TravelException);
     CHECK_THROWS_AS(Tour(9, "Bad", base.destination(), 3, usd(1), 0, base.itinerary()), TravelException);
@@ -112,7 +112,7 @@ TEST_CASE("Tour constructor rejects non-positive values", "[tours]")
 
 TEST_CASE("Departure seat management and timing", "[tours]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const DeparturePtr departure = agency.catalog().findDeparture(4);
     CHECK(departure->freeSeats() == 12);
     departure->reserveSeats(12);
@@ -146,7 +146,7 @@ TEST_CASE("Base Tour pricePerPerson and methods", "[tours]")
 
 TEST_CASE("Catalog search and lookup", "[tours]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     TourCatalog &catalog = agency.catalog();
 
     // 1. Поиск туров (первый, промежуточный, несуществующий)

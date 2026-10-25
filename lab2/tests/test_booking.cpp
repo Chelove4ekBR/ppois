@@ -6,7 +6,7 @@ using support::daysAfter;
 using support::today;
 using support::usd;
 
-static TravelAgency makeFixtureAgency() { return support::makeAgency(); }
+static TravelCompany makeFixtureAgency() { return support::makeAgency(); }
 
 TEST_CASE("Booking enum toString - status and payment method names", "[booking][enum]")
 {
@@ -75,7 +75,7 @@ TEST_CASE("CancellationPolicy penalty tiers", "[booking][cancellation]")
 
 TEST_CASE("InsurancePolicy claims", "[booking][insurance]")
 {
-    TravelAgency agency = makeFixtureAgency();
+    TravelCompany agency = makeFixtureAgency();
     CustomerPtr customer = support::makeCustomer();
     InsurancePolicy policy("POL-1", customer, usd(100000), DateRange(today(), daysAfter(60)), usd(5000));
     CHECK(InsurancePolicy::premiumFor(usd(100000), 30).cents() == 5000);
@@ -105,7 +105,7 @@ TEST_CASE("InsuranceClaim processing", "[booking][insurance]")
 
 TEST_CASE("Booking construction reserves seats", "[booking]")
 {
-    TravelAgency agency = makeFixtureAgency();
+    TravelCompany agency = makeFixtureAgency();
     DeparturePtr departure = agency.catalog().findDeparture(1);
     CustomerPtr customer = support::makeCustomer();
     const BookingPtr booking = std::make_shared<Booking>(1, customer, departure, 3, today());
@@ -118,7 +118,7 @@ TEST_CASE("Booking construction reserves seats", "[booking]")
 
 TEST_CASE("Booking payment lifecycle", "[booking]")
 {
-    TravelAgency agency = makeFixtureAgency();
+    TravelCompany agency = makeFixtureAgency();
     DeparturePtr departure = agency.catalog().findDeparture(1);
     CustomerPtr customer = support::makeCustomer();
     const BookingPtr booking = std::make_shared<Booking>(1, customer, departure, 1, today());
@@ -138,7 +138,7 @@ TEST_CASE("Booking payment lifecycle", "[booking]")
 
 TEST_CASE("Booking discount rules", "[booking]")
 {
-    TravelAgency agency = makeFixtureAgency();
+    TravelCompany agency = makeFixtureAgency();
     DeparturePtr departure = agency.catalog().findDeparture(1);
     CustomerPtr customer = support::makeCustomer();
     const BookingPtr booking = std::make_shared<Booking>(1, customer, departure, 1, today());
@@ -152,7 +152,7 @@ TEST_CASE("Booking discount rules", "[booking]")
 
 TEST_CASE("Cancelled booking rejects discount", "[booking]")
 {
-    TravelAgency agency = makeFixtureAgency();
+    TravelCompany agency = makeFixtureAgency();
     DeparturePtr departure = agency.catalog().findDeparture(1);
     CustomerPtr customer = support::makeCustomer();
     CancellationPolicy policy = agency.policy();
@@ -164,7 +164,7 @@ TEST_CASE("Cancelled booking rejects discount", "[booking]")
 
 TEST_CASE("Booking insurance must belong to customer", "[booking]")
 {
-    TravelAgency agency = makeFixtureAgency();
+    TravelCompany agency = makeFixtureAgency();
     DeparturePtr departure = agency.catalog().findDeparture(1);
     CustomerPtr customer = support::makeCustomer();
     const BookingPtr booking = std::make_shared<Booking>(1, customer, departure, 1, today());
@@ -177,7 +177,7 @@ TEST_CASE("Booking insurance must belong to customer", "[booking]")
 
 TEST_CASE("Booking cancellation refunds according to policy", "[booking]")
 {
-    TravelAgency agency = makeFixtureAgency();
+    TravelCompany agency = makeFixtureAgency();
     DeparturePtr departure = agency.catalog().findDeparture(1);
     CustomerPtr customer = support::makeCustomer();
     CancellationPolicy policy = agency.policy();
@@ -193,7 +193,7 @@ TEST_CASE("Booking cancellation refunds according to policy", "[booking]")
 
 TEST_CASE("Booking completion requires finished paid trip", "[booking]")
 {
-    TravelAgency agency = makeFixtureAgency();
+    TravelCompany agency = makeFixtureAgency();
     DeparturePtr departure = agency.catalog().findDeparture(1);
     CustomerPtr customer = support::makeCustomer();
     CancellationPolicy policy = agency.policy();
@@ -209,7 +209,7 @@ TEST_CASE("Booking completion requires finished paid trip", "[booking]")
 
 TEST_CASE("Invoice tracks overdue amounts", "[booking][invoice]")
 {
-    TravelAgency agency = makeFixtureAgency();
+    TravelCompany agency = makeFixtureAgency();
     DeparturePtr departure = agency.catalog().findDeparture(1);
     CustomerPtr customer = support::makeCustomer();
     const BookingPtr booking = std::make_shared<Booking>(1, customer, departure, 1, today());
@@ -229,7 +229,7 @@ TEST_CASE("Accountant records financial events", "[booking][accountant]")
 {
     Accountant accountant(2, support::makePerson("Irina", "Books", 1985), usd(250000), daysAfter(-400), "ACC-1");
     Ledger ledger("Books");
-    TravelAgency agency = makeFixtureAgency();
+    TravelCompany agency = makeFixtureAgency();
     DeparturePtr departure = agency.catalog().findDeparture(1);
     CustomerPtr customer = support::makeCustomer();
     const BookingPtr booking = std::make_shared<Booking>(1, customer, departure, 1, today());

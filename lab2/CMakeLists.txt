@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(TravelAgency)
+project(TravelCompany)
 
 file(GLOB TRAVEL_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 

@@ -59,7 +59,7 @@
 #include "Transfer.hpp"
 #include "Transport.hpp"
 #include "TransportTicket.hpp"
-#include "TravelAgency.hpp"
+#include "TravelCompany.hpp"
 #include "TravelGroup.hpp"
 #include "Visa.hpp"
 
@@ -78,7 +78,7 @@ namespace support
     DriverPtr makeDriver(const std::string &category = "BD");
     BusPtr makeBus(int capacity = 3);
     Airport airportIn(const std::string &code, const Country &country);
-    TravelAgency buildAgency(const Date &today);
-    TravelAgency makeAgency();
+    TravelCompany buildAgency(const Date &today);
+    TravelCompany makeAgency();
 
 }

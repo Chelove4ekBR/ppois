@@ -16,7 +16,7 @@
 #include "Ship.hpp"
 #include "SkiTour.hpp"
 #include "TourGuide.hpp"
-#include "TravelAgency.hpp"
+#include "TravelCompany.hpp"
 
 namespace
 {
@@ -45,12 +45,12 @@ namespace
         return Tour(id, name, dest, days, Money(priceCents), capacity, itinerary);
     }
 
-    TravelAgency buildDemoAgency(const Date &today)
+    TravelCompany buildDemoAgency(const Date &today)
     {
         CancellationPolicy policy(30, 20, 50, 7);
         auto accountant = std::make_shared<Accountant>(2, makePerson("Irina", "Books", 1985), Money(250000),
-                                                      today.addDays(-365), "ACC-2024-17");
-        TravelAgency agency("Travel Agency", policy, accountant);
+                                                       today.addDays(-365), "ACC-2024-17");
+        TravelCompany agency("Travel Company", policy, accountant);
 
         auto guide = std::make_shared<TourGuide>(10, makePerson("Elena", "Guide", 1988), Money(300000),
                                                  today.addDays(-365), std::vector<std::string>{"English", "Russian"}, Money(8000));
@@ -159,11 +159,12 @@ namespace
 int main()
 {
     const Date today = currentDate();
-    TravelAgency agency = buildDemoAgency(today);
+    TravelCompany agency = buildDemoAgency(today);
 
     while (std::cin)
     {
-        std::cout << "\n" << agency.name() << " (" << today.toString() << ")\n"
+        std::cout << "\n"
+                  << agency.name() << " (" << today.toString() << ")\n"
                   << "1. List tours and departures\n"
                   << "2. Register customer\n"
                   << "3. Create booking\n"

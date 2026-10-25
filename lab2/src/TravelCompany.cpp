@@ -1,11 +1,11 @@
-#include "TravelAgency.hpp"
+#include "TravelCompany.hpp"
 
 #include <algorithm>
 #include <utility>
 
 #include "Exceptions.hpp"
 
-TravelAgency::TravelAgency(std::string name, CancellationPolicy policy, std::shared_ptr<Accountant> accountant)
+TravelCompany::TravelCompany(std::string name, CancellationPolicy policy, std::shared_ptr<Accountant> accountant)
     : name_(std::move(name)),
       policy_(policy),
       accountant_(std::move(accountant)),
@@ -13,22 +13,22 @@ TravelAgency::TravelAgency(std::string name, CancellationPolicy policy, std::sha
       nextBookingId_(0),
       nextPaymentId_(0) {}
 
-void TravelAgency::registerCustomer(const CustomerPtr &customer)
+void TravelCompany::registerCustomer(const CustomerPtr &customer)
 {
     customers_.push_back(customer);
 }
 
-void TravelAgency::addOffice(const Office &office)
+void TravelCompany::addOffice(const Office &office)
 {
     offices_.push_back(office);
 }
 
-void TravelAgency::addDiscount(const Discount &discount)
+void TravelCompany::addDiscount(const Discount &discount)
 {
     discounts_.push_back(discount);
 }
 
-CustomerPtr TravelAgency::findCustomer(int customerId) const
+CustomerPtr TravelCompany::findCustomer(int customerId) const
 {
     for (const CustomerPtr &customer : customers_)
     {
@@ -40,7 +40,7 @@ CustomerPtr TravelAgency::findCustomer(int customerId) const
     throw CustomerNotFoundException("Customer " + std::to_string(customerId) + " not found");
 }
 
-BookingPtr TravelAgency::findBooking(int bookingId) const
+BookingPtr TravelCompany::findBooking(int bookingId) const
 {
     for (const BookingPtr &booking : bookings_)
     {
@@ -52,12 +52,12 @@ BookingPtr TravelAgency::findBooking(int bookingId) const
     throw BookingNotFoundException("Booking " + std::to_string(bookingId) + " not found");
 }
 
-void TravelAgency::notify(const CustomerPtr &customer, const std::string &message, const Date &date)
+void TravelCompany::notify(const CustomerPtr &customer, const std::string &message, const Date &date)
 {
     notifications_.emplace_back(customer, message, date);
 }
 
-BookingPtr TravelAgency::createBooking(int customerId, int departureId, int participants, const Date &today)
+BookingPtr TravelCompany::createBooking(int customerId, int departureId, int participants, const Date &today)
 {
     const CustomerPtr customer = findCustomer(customerId);
     const DeparturePtr departure = catalog_.findDeparture(departureId);
@@ -70,7 +70,7 @@ BookingPtr TravelAgency::createBooking(int customerId, int departureId, int part
     return booking;
 }
 
-void TravelAgency::applyDiscountCode(int bookingId, const std::string &code, const Date &today)
+void TravelCompany::applyDiscountCode(int bookingId, const std::string &code, const Date &today)
 {
     const BookingPtr booking = findBooking(bookingId);
     for (Discount &discount : discounts_)
@@ -84,7 +84,7 @@ void TravelAgency::applyDiscountCode(int bookingId, const std::string &code, con
     throw InvalidDiscountException("Unknown discount code: " + code);
 }
 
-void TravelAgency::payBooking(int bookingId, const Money &amount, PaymentMethod method, const Date &today)
+void TravelCompany::payBooking(int bookingId, const Money &amount, PaymentMethod method, const Date &today)
 {
     const BookingPtr booking = findBooking(bookingId);
     const Payment payment(++nextPaymentId_, amount, method, today);
@@ -97,7 +97,7 @@ void TravelAgency::payBooking(int bookingId, const Money &amount, PaymentMethod 
     }
 }
 
-Money TravelAgency::cancelBooking(int bookingId, const Date &today)
+Money TravelCompany::cancelBooking(int bookingId, const Date &today)
 {
     const BookingPtr booking = findBooking(bookingId);
     const Money refund = booking->cancel(policy_, today);
@@ -109,12 +109,12 @@ Money TravelAgency::cancelBooking(int bookingId, const Date &today)
     return refund;
 }
 
-void TravelAgency::addReview(const Review &review)
+void TravelCompany::addReview(const Review &review)
 {
     reviews_.push_back(review);
 }
 
-double TravelAgency::averageRating(int tourId) const
+double TravelCompany::averageRating(int tourId) const
 {
     int sum = 0;
     int count = 0;
@@ -129,7 +129,7 @@ double TravelAgency::averageRating(int tourId) const
     return count == 0 ? 0.0 : static_cast<double>(sum) / count;
 }
 
-int TravelAgency::fileComplaint(int customerId, int bookingId, const std::string &text)
+int TravelCompany::fileComplaint(int customerId, int bookingId, const std::string &text)
 {
     const CustomerPtr customer = findCustomer(customerId);
     const BookingPtr booking = findBooking(bookingId);
@@ -138,7 +138,7 @@ int TravelAgency::fileComplaint(int customerId, int bookingId, const std::string
     return complaintId;
 }
 
-void TravelAgency::resolveComplaint(int complaintId, const std::string &resolution)
+void TravelCompany::resolveComplaint(int complaintId, const std::string &resolution)
 {
     for (Complaint &complaint : complaints_)
     {
@@ -151,21 +151,21 @@ void TravelAgency::resolveComplaint(int complaintId, const std::string &resoluti
     throw TravelException("Complaint " + std::to_string(complaintId) + " not found");
 }
 
-std::size_t TravelAgency::openComplaintCount() const
+std::size_t TravelCompany::openComplaintCount() const
 {
     return static_cast<std::size_t>(
         std::count_if(complaints_.begin(), complaints_.end(), [](const Complaint &complaint)
                       { return complaint.isOpen(); }));
 }
 
-std::size_t TravelAgency::unreadNotifications(int customerId) const
+std::size_t TravelCompany::unreadNotifications(int customerId) const
 {
     return static_cast<std::size_t>(std::count_if(
         notifications_.begin(), notifications_.end(), [customerId](const Notification &notification)
         { return notification.isUnread() && notification.recipient()->customerId() == customerId; }));
 }
 
-SalesReport TravelAgency::generateReport(const std::string &title, const DateRange &period) const
+SalesReport TravelCompany::generateReport(const std::string &title, const DateRange &period) const
 {
     SalesReport report(title, period);
     for (const BookingPtr &booking : bookings_)

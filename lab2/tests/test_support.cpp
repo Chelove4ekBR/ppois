@@ -56,21 +56,21 @@ namespace support
             return hotel;
         }
 
-        void addBeachTour(TravelAgency &agency)
+        void addBeachTour(TravelCompany &agency)
         {
             const Country egypt("Egypt", "EG", "EGP", false);
             const Tour beach = makeBaseTour({1, "Red Sea Relax", 7, 80000, 20}, City("Hurghada", egypt, 2));
             agency.catalog().addTour(std::make_shared<BeachTour>(beach, "Makadi Bay", makeHotel(), true));
         }
 
-        void addIstanbulTour(TravelAgency &agency, const TourGuidePtr &guide)
+        void addIstanbulTour(TravelCompany &agency, const TourGuidePtr &guide)
         {
             const Country turkey("Turkey", "TR", "TRY", false);
             const Tour istanbul = makeBaseTour({2, "Istanbul Classic", 3, 30000, 15}, City("Istanbul", turkey, 3));
             agency.catalog().addTour(std::make_shared<ExcursionTour>(istanbul, guide, "English", 4));
         }
 
-        void addCruiseTour(TravelAgency &agency)
+        void addCruiseTour(TravelCompany &agency)
         {
             const Country italy("Italy", "IT", "EUR", false);
             const ShipPtr ship = std::make_shared<Ship>("Mediterranean Star", 200, 8, 400);
@@ -79,21 +79,21 @@ namespace support
             agency.catalog().addTour(std::make_shared<CruiseTour>(cruise, ship, "Ocean", ports));
         }
 
-        void addSkiTour(TravelAgency &agency)
+        void addSkiTour(TravelCompany &agency)
         {
             const Country austria("Austria", "AT", "EUR", false);
             const Tour ski = makeBaseTour({4, "Tyrol Ski Week", 6, 70000, 12}, City("Innsbruck", austria, 1));
             agency.catalog().addTour(std::make_shared<SkiTour>(ski, "Axamer Lizum", Money(4000), 2));
         }
 
-        void addKyotoTour(TravelAgency &agency, const TourGuidePtr &guide)
+        void addKyotoTour(TravelCompany &agency, const TourGuidePtr &guide)
         {
             const Country japan("Japan", "JP", "JPY", true);
             const Tour kyoto = makeBaseTour({5, "Kyoto Temples", 5, 120000, 10}, City("Kyoto", japan, 9));
             agency.catalog().addTour(std::make_shared<ExcursionTour>(kyoto, guide, "English", 8));
         }
 
-        void addTours(TravelAgency &agency, const Date &now)
+        void addTours(TravelCompany &agency, const Date &now)
         {
             const TourGuidePtr guide = makeGuide(now);
             addBeachTour(agency);
@@ -103,7 +103,7 @@ namespace support
             addKyotoTour(agency, guide);
         }
 
-        void addDepartures(TravelAgency &agency, const Date &now)
+        void addDepartures(TravelCompany &agency, const Date &now)
         {
             int offset = kFirstDepartureOffsetDays;
             for (const TourPtr &tour : agency.catalog().tours())
@@ -114,7 +114,7 @@ namespace support
             }
         }
 
-        void addOffice(TravelAgency &agency, const Date &now)
+        void addOffice(TravelCompany &agency, const Date &now)
         {
             const ManagerPtr manager = std::make_shared<Manager>(1, makePerson("Olga", "Boss", 1980), Money(500000),
                                                                  now.addDays(-kYearDays), "Sales", kManagerDiscountLimit);
@@ -189,12 +189,12 @@ namespace support
         return Airport(code, code + " airport", City(code + " city", country, 0));
     }
 
-    TravelAgency buildAgency(const Date &now)
+    TravelCompany buildAgency(const Date &now)
     {
         const CancellationPolicy policy(kFreeCancellationDays, kEarlyPenaltyPercent, kLatePenaltyPercent, kLateThresholdDays);
         const auto accountant = std::make_shared<Accountant>(2, makePerson("Irina", "Books", 1985), Money(250000),
                                                              now.addDays(-kYearDays), "ACC-2024-17");
-        TravelAgency agency("Horizon Travel", policy, accountant);
+        TravelCompany agency("Horizon Travel", policy, accountant);
         addTours(agency, now);
         addDepartures(agency, now);
         addOffice(agency, now);
@@ -204,7 +204,7 @@ namespace support
         return agency;
     }
 
-    TravelAgency makeAgency()
+    TravelCompany makeAgency()
     {
         return buildAgency(today());
     }

@@ -7,14 +7,14 @@ using support::daysAfter;
 using support::today;
 using support::usd;
 
-static BookingPtr bookingFor(TravelAgency &agency, int customerId = 1, int departureId = 1, int participants = 2)
+static BookingPtr bookingFor(TravelCompany &agency, int customerId = 1, int departureId = 1, int participants = 2)
 {
     return agency.createBooking(customerId, departureId, participants, today());
 }
 
 TEST_CASE("Review validates rating and summarizes", "[service]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const TourPtr tour = agency.catalog().findTour(1);
     const Review review(support::makeCustomer(), tour, 5, "Great");
     CHECK(review.isPositive());
@@ -28,7 +28,7 @@ TEST_CASE("Review validates rating and summarizes", "[service]")
 
 TEST_CASE("Complaint resolution flow", "[service]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const BookingPtr booking = bookingFor(agency);
     Complaint complaint(1, support::makeCustomer(), booking, "Noisy hotel");
     CHECK(complaint.isOpen());
@@ -63,7 +63,7 @@ TEST_CASE("Office staff and payroll", "[service]")
 
 TEST_CASE("Agency booking happy path", "[agency]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const BookingPtr booking = bookingFor(agency);
     CHECK(booking->status() == BookingStatus::Confirmed);
     CHECK(agency.findBooking(booking->id()) == booking);
@@ -79,7 +79,7 @@ TEST_CASE("Agency booking happy path", "[agency]")
 
 TEST_CASE("Agency lookup failures use dedicated exceptions", "[agency]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     CHECK_THROWS_AS(agency.findCustomer(99), CustomerNotFoundException);
     CHECK_THROWS_AS(agency.findBooking(99), BookingNotFoundException);
     CHECK_THROWS_AS(bookingFor(agency, 99), CustomerNotFoundException);
@@ -88,7 +88,7 @@ TEST_CASE("Agency lookup failures use dedicated exceptions", "[agency]")
 
 TEST_CASE("Agency visa is checked before booking", "[agency]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     CHECK_THROWS_AS(bookingFor(agency, 1, 5, 1), VisaRequiredException);
     agency.findCustomer(1)->addVisa(Visa("JP", "tourist", DateRange(today(), daysAfter(200))));
     CHECK_NOTHROW(bookingFor(agency, 1, 5, 1));
@@ -96,7 +96,7 @@ TEST_CASE("Agency visa is checked before booking", "[agency]")
 
 TEST_CASE("Agency discount codes", "[agency]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const BookingPtr booking = bookingFor(agency, 1, 1, 1);
     agency.applyDiscountCode(booking->id(), "WELCOME10", today());
     CHECK(booking->total().cents() == 76500);
@@ -105,7 +105,7 @@ TEST_CASE("Agency discount codes", "[agency]")
 
 TEST_CASE("Agency cancellation refunds and logs expense", "[agency]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const BookingPtr booking = bookingFor(agency, 1, 1, 1);
     agency.payBooking(booking->id(), usd(50000), PaymentMethod::Cash, today());
     const Money refund = agency.cancelBooking(booking->id(), today());
@@ -118,7 +118,7 @@ TEST_CASE("Agency cancellation refunds and logs expense", "[agency]")
 
 TEST_CASE("Agency reviews and complaints", "[agency]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const TourPtr tour = agency.catalog().findTour(1);
     CHECK(agency.averageRating(1) == 0.0);
     agency.addReview(Review(agency.findCustomer(1), tour, 5, "Great"));
@@ -135,7 +135,7 @@ TEST_CASE("Agency reviews and complaints", "[agency]")
 
 TEST_CASE("Agency offices are registered", "[agency]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     CHECK(agency.offices().size() == 1U);
     CHECK(agency.customers().size() == 2U);
     CHECK(agency.name() == "Horizon Travel");
@@ -143,7 +143,7 @@ TEST_CASE("Agency offices are registered", "[agency]")
 
 TEST_CASE("SalesReport aggregates bookings", "[salesreport]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     const BookingPtr first = bookingFor(agency, 1, 1, 1);
     const BookingPtr second = bookingFor(agency, 2, 2, 1);
     agency.payBooking(first->id(), usd(85000), PaymentMethod::Card, today());
@@ -160,7 +160,7 @@ TEST_CASE("SalesReport aggregates bookings", "[salesreport]")
 
 TEST_CASE("SalesReport empty and out-of-period reports", "[salesreport]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     SalesReport report("Empty", DateRange(daysAfter(-10), daysAfter(-5)));
     CHECK(report.averageBookingValue().cents() == 0);
     CHECK_THROWS_AS(report.topTourName(), TravelException);
@@ -169,7 +169,7 @@ TEST_CASE("SalesReport empty and out-of-period reports", "[salesreport]")
 
 TEST_CASE("SalesReport aggregates bookings with repeated tours", "[salesreport]")
 {
-    TravelAgency agency = support::makeAgency();
+    TravelCompany agency = support::makeAgency();
     // Два бронирования одного и того же тура (id 1)
     const BookingPtr first = bookingFor(agency, 1, 1, 1);
     const BookingPtr second = bookingFor(agency, 2, 1, 1);

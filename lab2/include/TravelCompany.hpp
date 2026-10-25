@@ -23,17 +23,17 @@
 #include "TourCatalog.hpp"
 
 /**
- * @brief Координирует работу туристического агентства: клиентов, каталог, бронирования, платежи, жалобы и отчётность.
+ * @brief Координирует работу туристической компании: клиентов, каталог, бронирования, платежи, жалобы и отчётность.
  */
-class TravelAgency {
+class TravelCompany {
 public:
     /**
-     * @brief Создаёт объект класса TravelAgency и инициализирует его исходные данные.
+     * @brief Создаёт объект класса TravelCompany и инициализирует его исходные данные.
      * @param name название объекта.
      * @param policy правила или полис.
      * @param accountant значение параметра «accountant».
      */
-    TravelAgency(std::string name, CancellationPolicy policy, std::shared_ptr<Accountant> accountant);
+    TravelCompany(std::string name, CancellationPolicy policy, std::shared_ptr<Accountant> accountant);
     /**
      * @brief Возвращает название или имя объекта.
      * @return Ссылка на сохранённый атрибут `name_`.
@@ -75,17 +75,17 @@ public:
      */
     const std::vector<Office>& offices() const { return offices_; }
     /**
-     * @brief Регистрирует клиента в агентстве.
+     * @brief Регистрирует клиента в компании.
      * @param customer клиент.
      */
     void registerCustomer(const CustomerPtr& customer);
     /**
-     * @brief Добавляет офис в агентство.
+     * @brief Добавляет офис в компанию.
      * @param office значение параметра «office».
      */
     void addOffice(const Office& office);
     /**
-     * @brief Добавляет скидку в агентство.
+     * @brief Добавляет скидку в компанию.
      * @param discount скидка.
      */
     void addDiscount(const Discount& discount);
@@ -133,7 +133,7 @@ public:
      */
     Money cancelBooking(int bookingId, const Date& today);
     /**
-     * @brief Добавляет отзыв в систему агентства.
+     * @brief Добавляет отзыв в систему компании.
      * @param review значение параметра «review».
      */
     void addReview(const Review& review);
@@ -152,7 +152,7 @@ public:
      */
     int fileComplaint(int customerId, int bookingId, const std::string& text);
     /**
-     * @brief Сохраняет решение по жалобе в агентстве.
+     * @brief Сохраняет решение по жалобе в компании.
      * @param complaintId идентификатор жалобы.
      * @param resolution решение по жалобе.
      */
