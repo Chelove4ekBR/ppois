@@ -5,14 +5,15 @@
 | Lab | Language | Contents                                                | Docs                                       |
 |-----|----------|---------------------------------------------------------|--------------------------------------------|
 | 1   | C++      | [Set](./lab1/Set), [Matrix](./lab1/Matrix)              | Doxygen, [Documentation](#documentation) |
-| 2   | C++      | [TravelAgency](./lab2)                                  | Doxygen, [Documentation](#documentation) |
+| 2   | C++      | [TravelCompany](./lab2)                                  | Doxygen, [Documentation](#documentation) |
+| 3   | C++      | [Computer](./lab3)                                  | Doxygen, [Documentation](#documentation) |
 
 Each project has the same layout:
 
 ```
 include/   class declarations (.h)
 src/       class implementation (.cpp)
-sli/       console menu (main.cpp)
+cli/       console menu (main.cpp)
 tests/     unit tests (Catch2)
 ```
 
