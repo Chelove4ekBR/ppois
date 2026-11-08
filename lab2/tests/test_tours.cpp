@@ -30,6 +30,10 @@ TEST_CASE("Itinerary day and totals", "[tours]")
     CHECK_FALSE(day.isOverloaded());
     day.addActivity(Activity("Marathon", 600, usd(0), true));
     CHECK(day.isOverloaded());
+
+    ItineraryDay mixedDay(2, "Mixed");
+    mixedDay.addActivity(Activity("Eur Activity", 60, Money(100, "EUR"), false));
+    CHECK_THROWS_AS(mixedDay.totalCost(), CurrencyMismatchException);
 }
 
 TEST_CASE("Itinerary enforces day order and finds busiest day", "[tours]")
@@ -46,6 +50,12 @@ TEST_CASE("Itinerary enforces day order and finds busiest day", "[tours]")
     CHECK(itinerary.totalDays() == 2);
     CHECK(itinerary.totalCost().cents() == 300);
     CHECK(itinerary.busiestDay().dayNumber() == 2);
+
+    Itinerary mixedItinerary("Mixed", City("Rome", support::visaFreeCountry(), 1));
+    ItineraryDay dayWithEur(1, "EUR Day");
+    dayWithEur.addActivity(Activity("Colosseum", 60, Money(100, "EUR"), false));
+    mixedItinerary.addDay(dayWithEur);
+    CHECK_THROWS_AS(mixedItinerary.totalCost(), CurrencyMismatchException);
 }
 
 TEST_CASE("BeachTour pricing", "[tours]")
@@ -168,6 +178,7 @@ TEST_CASE("Catalog search and lookup", "[tours]")
     CHECK(catalog.findAffordable(usd(10000000)).size() == 5U);
     CHECK(catalog.findAffordable(usd(100000)).size() == 3U);
     CHECK(catalog.findAffordable(usd(1000)).empty());
+    CHECK_THROWS_AS(catalog.findAffordable(Money(1000, "EUR")), CurrencyMismatchException);
 
     // 5. Доступные отправления: обычные и отсечение по дате
     CHECK(catalog.availableDepartures(support::today()).size() == 5U);

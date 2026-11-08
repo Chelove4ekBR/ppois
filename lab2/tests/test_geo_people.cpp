@@ -54,6 +54,10 @@ TEST_CASE("Destination aggregates attractions", "[geo]") {
     CHECK(destination.attractionsWithin(90).size() == 1U);
     CHECK(destination.isBestSeason(Date(2026, 10, 1)));
     CHECK_FALSE(destination.isBestSeason(Date(2026, 7, 1)));
+
+    Destination mixedDest(cairo(), "Mixed", {10, 11});
+    mixedDest.addAttraction(Attraction("Pyramids", Money(3000, "EUR"), 180, false));
+    CHECK_THROWS_AS(mixedDest.totalAttractionCost(), CurrencyMismatchException);
 }
 
 TEST_CASE("LoyaltyAccount tiers follow points", "[loyalty]") {
@@ -141,6 +145,10 @@ TEST_CASE("Manager team management", "[people]") {
     CHECK(manager.canApproveDiscount(25));
     CHECK_FALSE(manager.canApproveDiscount(26));
     CHECK(manager.describeRole() == "Manager of Sales: Olga Boss");
+
+    const auto eurClerk = std::make_shared<Employee>(4, support::makePerson("Euro", "Clerk", 1985), "Clerk", Money(100000, "EUR"), daysAfter(-50));
+    manager.addSubordinate(eurClerk);
+    CHECK_THROWS_AS(manager.teamPayroll(), CurrencyMismatchException);
 }
 
 TEST_CASE("Driver license and rest", "[people]") {

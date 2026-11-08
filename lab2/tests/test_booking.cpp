@@ -252,4 +252,9 @@ TEST_CASE("Ledger empty handling", "[booking][ledger]")
     CHECK(emptyLedger.totalIncome().cents() == 0);
     CHECK(emptyLedger.totalExpenses().cents() == 0);
     CHECK(emptyLedger.entriesOn(today()) == 0U);
+
+    Ledger mixedLedger("Mixed");
+    mixedLedger.record(LedgerEntry("Sale", Money(100, "EUR"), today(), true));
+    CHECK_THROWS_AS(mixedLedger.balance(), CurrencyMismatchException);
+    CHECK_THROWS_AS(mixedLedger.totalIncome(), CurrencyMismatchException);
 }
