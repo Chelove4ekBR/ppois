@@ -137,7 +137,7 @@ namespace
             makeBaseTour(3, "Mediterranean Cruise", 10, 150000, 30, City("Rome", italy, 1),
                          "Круизный маршрут по жемчужинам Средиземноморья",
                          "Колизей и Римский форум", 5000, 180),
-            ship, "Ocean View Balcony", std::vector<City>{City("Naples", italy, 1), City("Palermo", italy, 1)}));
+            ship, "Ocean", std::vector<City>{City("Naples", italy, 1), City("Palermo", italy, 1)}));
 
         // 4. Горнолыжный тур (Инсбрук, Австрия)
         Country austria("Австрия", "AT", "EUR", false);
