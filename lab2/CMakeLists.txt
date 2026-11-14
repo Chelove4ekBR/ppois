@@ -1,10 +1,22 @@
 cmake_minimum_required(VERSION 3.16)
 project(TravelCompany)
 
-file(GLOB TRAVEL_SOURCES CONFIGURE_DEPENDS src/*.cpp)
+file(GLOB_RECURSE TRAVEL_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 
 add_library(travel_lib ${TRAVEL_SOURCES})
-target_include_directories(travel_lib PUBLIC include)
+target_include_directories(travel_lib PUBLIC
+    include
+    include/core
+    include/geo
+    include/customer
+    include/staff
+    include/transport
+    include/lodging
+    include/tours
+    include/booking
+    include/service
+    include/company
+)
 target_compile_options(travel_lib PRIVATE -Wall -Wextra -Wpedantic)
 
 
@@ -16,10 +28,24 @@ find_package(Catch2 REQUIRED)
 file(GLOB TEST_SOURCES CONFIGURE_DEPENDS tests/*.cpp)
 
 add_library(travel_lib_cov STATIC ${TRAVEL_SOURCES})
-target_include_directories(travel_lib_cov PUBLIC include)
+target_include_directories(travel_lib_cov PUBLIC
+    include
+    include/core
+    include/geo
+    include/customer
+    include/staff
+    include/transport
+    include/lodging
+    include/tours
+    include/booking
+    include/service
+    include/company
+)
 target_compile_options(travel_lib_cov PRIVATE -Wall -Wextra -Wpedantic --coverage -O0 -g)
 target_link_options(travel_lib_cov INTERFACE --coverage)
 
+enable_testing()
 add_executable(travel_tests ${TEST_SOURCES})
 target_link_libraries(travel_tests PRIVATE travel_lib_cov Catch2::Catch2WithMain)
 target_compile_options(travel_tests PRIVATE --coverage -O0 -g)
+add_test(NAME travel_tests COMMAND travel_tests)
