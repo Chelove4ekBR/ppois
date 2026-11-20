@@ -1,12 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include "test_support.hpp"
 
-#include "ByteSize.hpp"
-#include "ClockFrequency.hpp"
-#include "Exceptions.hpp"
-#include "PowerSupplyUnit.hpp"
-#include "ThermalZone.hpp"
-#include "Voltage.hpp"
+#include "common/ByteSize.hpp"
+#include "common/ClockFrequency.hpp"
+#include "common/Exceptions.hpp"
+#include "power/PowerSupplyUnit.hpp"
+#include "cooling/ThermalZone.hpp"
+#include "common/Voltage.hpp"
 
 TEST_CASE("ByteSize conversions, arithmetic and errors", "[bytesize]") {
     ByteSize b1 = ByteSize::fromKiB(2);

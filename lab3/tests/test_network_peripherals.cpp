@@ -1,19 +1,19 @@
 #include <catch2/catch_test_macros.hpp>
 #include "test_support.hpp"
 
-#include "ByteSize.hpp"
-#include "Exceptions.hpp"
-#include "IpAddress.hpp"
-#include "Keyboard.hpp"
-#include "MacAddress.hpp"
-#include "Mouse.hpp"
-#include "NetworkAdapter.hpp"
-#include "NetworkConnection.hpp"
-#include "NetworkPacket.hpp"
-#include "UsbHub.hpp"
-#include "UsbPort.hpp"
-#include "Webcam.hpp"
-#include "WifiInterface.hpp"
+#include "common/ByteSize.hpp"
+#include "common/Exceptions.hpp"
+#include "network/IpAddress.hpp"
+#include "peripherals/Keyboard.hpp"
+#include "network/MacAddress.hpp"
+#include "peripherals/Mouse.hpp"
+#include "network/NetworkAdapter.hpp"
+#include "network/NetworkConnection.hpp"
+#include "network/NetworkPacket.hpp"
+#include "peripherals/UsbHub.hpp"
+#include "peripherals/UsbPort.hpp"
+#include "peripherals/Webcam.hpp"
+#include "network/WifiInterface.hpp"
 
 TEST_CASE("MacAddress parsing, broadcast and multicast", "[mac_address]") {
     MacAddress mac({0x00, 0x1A, 0x2B, 0x3C, 0x4D, 0x5E});

@@ -1,17 +1,17 @@
 #include <catch2/catch_test_macros.hpp>
 #include "test_support.hpp"
 
-#include "Bios.hpp"
-#include "Chipset.hpp"
-#include "ClockFrequency.hpp"
-#include "Cpu.hpp"
-#include "CpuCooler.hpp"
-#include "CpuCore.hpp"
-#include "Exceptions.hpp"
-#include "Motherboard.hpp"
-#include "PcieBus.hpp"
-#include "PcieSlot.hpp"
-#include "ThermalPaste.hpp"
+#include "motherboard/Bios.hpp"
+#include "motherboard/Chipset.hpp"
+#include "common/ClockFrequency.hpp"
+#include "cpu/Cpu.hpp"
+#include "cpu/CpuCooler.hpp"
+#include "cpu/CpuCore.hpp"
+#include "common/Exceptions.hpp"
+#include "motherboard/Motherboard.hpp"
+#include "motherboard/PcieBus.hpp"
+#include "motherboard/PcieSlot.hpp"
+#include "cpu/ThermalPaste.hpp"
 
 TEST_CASE("CpuCore execution, throttling and activity toggle", "[cpu_core]") {
     CpuCore core(0, ClockFrequency::fromGHz(3.0));

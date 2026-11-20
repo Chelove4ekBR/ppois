@@ -1,15 +1,15 @@
 #include <catch2/catch_test_macros.hpp>
 #include "test_support.hpp"
 
-#include "AudioOutput.hpp"
-#include "ByteSize.hpp"
-#include "ClockFrequency.hpp"
-#include "Display.hpp"
-#include "Exceptions.hpp"
-#include "Gpu.hpp"
-#include "GraphicsCard.hpp"
-#include "SoundCard.hpp"
-#include "VideoPort.hpp"
+#include "audio/AudioOutput.hpp"
+#include "common/ByteSize.hpp"
+#include "common/ClockFrequency.hpp"
+#include "graphics/Display.hpp"
+#include "common/Exceptions.hpp"
+#include "graphics/Gpu.hpp"
+#include "graphics/GraphicsCard.hpp"
+#include "audio/SoundCard.hpp"
+#include "graphics/VideoPort.hpp"
 
 TEST_CASE("Gpu rendering, compute and overclocking", "[gpu]") {
     Gpu gpu("GeForce RTX 4070 Ti", 7680, ClockFrequency::fromMHz(2310), 285);

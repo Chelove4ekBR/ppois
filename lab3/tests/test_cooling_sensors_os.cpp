@@ -1,16 +1,16 @@
 #include <catch2/catch_test_macros.hpp>
 #include "test_support.hpp"
 
-#include "ByteSize.hpp"
-#include "CaseFan.hpp"
-#include "ComputerCase.hpp"
-#include "DeviceDriver.hpp"
-#include "Exceptions.hpp"
-#include "HardwareSensor.hpp"
-#include "OperatingSystem.hpp"
-#include "Process.hpp"
-#include "ProcessScheduler.hpp"
-#include "UninterruptiblePowerSupply.hpp"
+#include "common/ByteSize.hpp"
+#include "cooling/CaseFan.hpp"
+#include "chassis/ComputerCase.hpp"
+#include "os/DeviceDriver.hpp"
+#include "common/Exceptions.hpp"
+#include "cooling/HardwareSensor.hpp"
+#include "os/OperatingSystem.hpp"
+#include "os/Process.hpp"
+#include "os/ProcessScheduler.hpp"
+#include "power/UninterruptiblePowerSupply.hpp"
 
 TEST_CASE("CaseFan PWM speed, airflow and noise", "[case_fan]") {
     CaseFan fan(140, 2000, 80.0);
