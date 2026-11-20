@@ -104,12 +104,12 @@ TEST_CASE("CruiseTour cabin categories", "[tours]")
 TEST_CASE("SkiTour pricing", "[tours]")
 {
     TravelCompany agency = support::makeAgency();
-    const auto ski = tourAt<SkiTour>(agency, 3);
-    CHECK(ski->skiPassCost().cents() == 24000);
-    CHECK(ski->pricePerPerson().cents() == 94000);
-    CHECK(ski->isForBeginners());
-    CHECK(ski->resortName() == "Axamer Lizum");
-    CHECK(ski->describe().find("Ski tour") != std::string::npos);
+    const auto skiTour = tourAt<SkiTour>(agency, 3);
+    CHECK(skiTour->skiPassCost().cents() == 24000);
+    CHECK(skiTour->pricePerPerson().cents() == 94000);
+    CHECK(skiTour->isForBeginners());
+    CHECK(skiTour->resortName() == "Axamer Lizum");
+    CHECK(skiTour->describe().find("Ski tour") != std::string::npos);
 }
 
 TEST_CASE("Tour constructor rejects non-positive values", "[tours]")
@@ -185,9 +185,9 @@ TEST_CASE("Catalog search and lookup", "[tours]")
     CHECK(catalog.availableDepartures(daysAfter(45)).size() == 3U);
 
     // 6. Закрытие ветки !isSoldOut() == false (тур будущий, но мест нет)
-    DeparturePtr dep = catalog.findDeparture(1);
-    dep->reserveSeats(dep->freeSeats());
-    CHECK(dep->isSoldOut());
+    DeparturePtr departure = catalog.findDeparture(1);
+    departure->reserveSeats(departure->freeSeats());
+    CHECK(departure->isSoldOut());
     CHECK(catalog.availableDepartures(support::today()).size() == 4U);
 
     // 7. Поведение на пустом каталоге и прямое добавление отправления

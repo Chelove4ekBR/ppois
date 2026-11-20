@@ -1,209 +1,244 @@
+#include <algorithm>
+#include <cstddef>
 #include <ctime>
 #include <iomanip>
 #include <iostream>
 #include <memory>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include "staff/Accountant.hpp"
-#include "tours/Activity.hpp"
-#include "core/Address.hpp"
-#include "geo/Attraction.hpp"
-#include "tours/BeachTour.hpp"
 #include "booking/Booking.hpp"
 #include "booking/CancellationPolicy.hpp"
-#include "geo/City.hpp"
-#include "service/Complaint.hpp"
-#include "core/ContactInfo.hpp"
-#include "geo/Country.hpp"
-#include "tours/CruiseTour.hpp"
-#include "customer/Customer.hpp"
-#include "core/Date.hpp"
-#include "core/DateRange.hpp"
-#include "geo/Destination.hpp"
 #include "booking/Discount.hpp"
-#include "staff/Employee.hpp"
-#include "core/Exceptions.hpp"
-#include "tours/ExcursionTour.hpp"
-#include "lodging/Hotel.hpp"
-#include "service/InsurancePolicy.hpp"
 #include "booking/Invoice.hpp"
-#include "tours/Itinerary.hpp"
-#include "tours/ItineraryDay.hpp"
 #include "booking/Ledger.hpp"
 #include "booking/LedgerEntry.hpp"
-#include "customer/LoyaltyAccount.hpp"
-#include "staff/Manager.hpp"
-#include "core/Money.hpp"
-#include "staff/Office.hpp"
-#include "customer/Passport.hpp"
 #include "booking/Payment.hpp"
-#include "customer/Person.hpp"
-#include "service/Review.hpp"
 #include "booking/SalesReport.hpp"
-#include "transport/Ship.hpp"
+#include "company/TravelCompany.hpp"
+#include "core/Address.hpp"
+#include "core/ContactInfo.hpp"
+#include "core/Date.hpp"
+#include "core/DateRange.hpp"
+#include "core/Exceptions.hpp"
+#include "core/Money.hpp"
+#include "customer/Customer.hpp"
+#include "customer/Passport.hpp"
+#include "customer/Person.hpp"
+#include "customer/Visa.hpp"
+#include "geo/Attraction.hpp"
+#include "geo/City.hpp"
+#include "geo/Country.hpp"
+#include "geo/Destination.hpp"
+#include "lodging/Hotel.hpp"
+#include "service/Complaint.hpp"
+#include "service/InsurancePolicy.hpp"
+#include "service/Review.hpp"
+#include "staff/Accountant.hpp"
+#include "staff/Employee.hpp"
+#include "staff/Manager.hpp"
+#include "staff/Office.hpp"
+#include "staff/TourGuide.hpp"
+#include "tours/Activity.hpp"
+#include "tours/BeachTour.hpp"
+#include "tours/CruiseTour.hpp"
+#include "tours/ExcursionTour.hpp"
+#include "tours/Itinerary.hpp"
+#include "tours/ItineraryDay.hpp"
 #include "tours/SkiTour.hpp"
 #include "tours/Tour.hpp"
 #include "tours/TourCatalog.hpp"
 #include "tours/TourDeparture.hpp"
-#include "staff/TourGuide.hpp"
-#include "company/TravelCompany.hpp"
-#include "customer/Visa.hpp"
+#include "transport/Ship.hpp"
 
 namespace
 {
 
+    constexpr int kNoDefault = -1;
+    constexpr int kCentsPerUsd = 100;
+
+    constexpr int kExitChoice = 0;
+    constexpr int kCompanyChoice = 1;
+    constexpr int kMaxSetupChoice = 1;
+    constexpr int kMaxMainChoice = 26;
+    constexpr int kInvalidChoice = -1;
+
+    constexpr int kDefaultBirthYear = 1990;
+    constexpr int kDefaultAccountantSalaryUsd = 2500;
+    constexpr int kDefaultManagerSalaryUsd = 3000;
+    constexpr int kDefaultManagerDiscountLimit = 20;
+    constexpr int kDefaultGuideSalaryUsd = 1000;
+    constexpr int kDefaultGuideDailyRateUsd = 100;
+    constexpr int kPassportValidityYears = 10;
+
+    constexpr int kDefaultTourDays = 7;
+    constexpr long long kDefaultTourPriceUsd = 1000;
+    constexpr int kDefaultCapacity = 10;
+    constexpr int kDefaultHotelStars = 4;
+    constexpr int kDefaultHotelRoomNumber = 101;
+    constexpr int kDefaultWalkingKm = 5;
+    constexpr int kDefaultSkiDifficulty = 2;
+    constexpr long long kDefaultSkiPassUsd = 50;
+    constexpr int kMinDifficulty = 1;
+    constexpr int kMaxDifficulty = 5;
+    constexpr int kDefaultDepartureOffsetDays = 30;
+
+    constexpr int kDefaultFreeDays = 30;
+    constexpr int kDefaultEarlyPenalty = 20;
+    constexpr int kDefaultLatePenalty = 50;
+    constexpr int kDefaultLateThreshold = 7;
+    constexpr int kDefaultDiscountPercent = 10;
+    constexpr int kDefaultDiscountUses = 100;
+    constexpr int kDefaultReportDays = 365;
+
     struct AppState
     {
-        TravelCompany agency;
+        explicit AppState(const Date &currentDate) : today(currentDate) {}
+
+        bool hasCompany() const { return agency != nullptr; }
+
+        std::unique_ptr<TravelCompany> agency;
         std::shared_ptr<Accountant> accountant;
+        std::vector<TourGuidePtr> guides;
         Date today;
+        int nextEmployeeId = 1;
     };
 
-    Person makePerson(const std::string &first, const std::string &last, int birthYear,
-                      const std::string &email = "", const std::string &phone = "")
+    std::string prompt(const std::string &message, const std::string &defaultValue = "")
     {
-        std::string e = email.empty() ? (first + "." + last + "@example.com") : email;
-        std::string p = phone.empty() ? "+7 900 123 45 67" : phone;
-        return Person(first, last, Date(birthYear, 1, 1),
-                      ContactInfo(e, p),
-                      Address("Россия", "Москва", "ул. Тверская, д. 1", "125009"));
-    }
-
-    CustomerPtr makeCustomer(int id, const std::string &first, const std::string &last,
-                             int birthYear, const std::string &email, const std::string &phone,
-                             const std::string &passportNumber, const Date &today)
-    {
-        Passport passport(passportNumber.empty() ? ("P" + std::to_string(id) + "789012") : passportNumber,
-                          "RU", first + " " + last, today.addDays(3650));
-        return std::make_shared<Customer>(id, makePerson(first, last, birthYear, email, phone), passport);
-    }
-
-    Tour makeBaseTour(int id, const std::string &name, int days, long long priceCents, int capacity,
-                      const City &city, const std::string &destDesc, const std::string &attrName,
-                      long long attrPriceCents, int attrMinutes)
-    {
-        Destination dest(city, destDesc, {5, 6, 7, 8, 9, 10});
-        dest.addAttraction(Attraction(attrName, Money(attrPriceCents), attrMinutes, false));
-
-        Itinerary itinerary(name + " — программа тура", city);
-        ItineraryDay day1(1, "День 1: Прибытие, трансфер и приветственный ужин");
-        day1.addActivity(Activity("Обзорная пешая прогулка", 90, Money(0), true));
-        day1.addActivity(Activity("Приветственный гастрономический ужин", 120, Money(3500), false));
-        itinerary.addDay(day1);
-
-        ItineraryDay day2(2, "День 2: Основная экскурсионная программа");
-        day2.addActivity(Activity("Посещение главных достопримечательностей", 180, Money(2500), true));
-        itinerary.addDay(day2);
-
-        return Tour(id, name, dest, days, Money(priceCents), capacity, itinerary);
-    }
-
-    AppState buildDemoAgency(const Date &today)
-    {
-        CancellationPolicy policy(30, 20, 50, 7);
-        auto accountant = std::make_shared<Accountant>(2, makePerson("Ирина", "Книгина", 1985), Money(250000),
-                                                       today.addDays(-365), "ACC-2024-RUS-17");
-        TravelCompany agency("Travel Company Deluxe", policy, accountant);
-
-        auto guideElena = std::make_shared<TourGuide>(10, makePerson("Елена", "Гидман", 1988), Money(300000),
-                                                      today.addDays(-365), std::vector<std::string>{"English", "Russian", "Turkish"}, Money(8000));
-
-        // 1. Пляжный тур (Хургада, Египет)
-        Country egypt("Египет", "EG", "EGP", false);
-        auto hotel = std::make_shared<Hotel>("Sea Breeze Resort & Spa", 5,
-                                             Address("Египет", "Хургада", "Корниш Роуд 10", "84511"));
-        hotel->addRoom(101, 2, Money(9000));
-        hotel->addRoom(102, 3, Money(12000));
-        agency.catalog().addTour(std::make_shared<BeachTour>(
-            makeBaseTour(1, "Red Sea Relax", 7, 80000, 20, City("Hurghada", egypt, 2),
-                         "Курортная зона Макади Бэй на побережье Красного моря",
-                         "Морской заповедник коралловых рифов", 4000, 180),
-            "Макади Бэй", hotel, true));
-
-        // 2. Экскурсионный тур (Стамбул, Турция)
-        Country turkey("Турция", "TR", "TRY", false);
-        agency.catalog().addTour(std::make_shared<ExcursionTour>(
-            makeBaseTour(2, "Istanbul Classic", 3, 30000, 15, City("Istanbul", turkey, 3),
-                         "Исторический центр Стамбула (Султанахмет)",
-                         "Собор Святой Софии и Голубая мечеть", 3000, 120),
-            guideElena, "Russian", 5));
-
-        // 3. Круизный тур (Средиземное море, Италия)
-        Country italy("Италия", "IT", "EUR", false);
-        auto ship = std::make_shared<Ship>("Mediterranean Star", 250, 8, 500);
-        agency.catalog().addTour(std::make_shared<CruiseTour>(
-            makeBaseTour(3, "Mediterranean Cruise", 10, 150000, 30, City("Rome", italy, 1),
-                         "Круизный маршрут по жемчужинам Средиземноморья",
-                         "Колизей и Римский форум", 5000, 180),
-            ship, "Ocean", std::vector<City>{City("Naples", italy, 1), City("Palermo", italy, 1)}));
-
-        // 4. Горнолыжный тур (Инсбрук, Австрия)
-        Country austria("Австрия", "AT", "EUR", false);
-        agency.catalog().addTour(std::make_shared<SkiTour>(
-            makeBaseTour(4, "Tyrol Ski Week", 6, 70000, 12, City("Innsbruck", austria, 1),
-                         "Альпийский горнолыжный регион Тироль",
-                         "Смотровой комплекс Нордкетте", 4500, 90),
-            "Axamer Lizum", Money(4000), 2));
-
-        // 5. Экскурсионный тур (Киото, Япония)
-        Country japan("Япония", "JP", "JPY", true);
-        agency.catalog().addTour(std::make_shared<ExcursionTour>(
-            makeBaseTour(5, "Kyoto Temples", 5, 120000, 10, City("Kyoto", japan, 9),
-                         "Древняя столица Японии с тысячью храмов",
-                         "Храмовый ансамбль Кинкаку-дзи", 2000, 150),
-            guideElena, "English", 8));
-
-        // Отправления по турам
-        int offset = 15;
-        for (const auto &tour : agency.catalog().tours())
+        std::cout << message;
+        if (!defaultValue.empty())
         {
-            Date start = today.addDays(offset);
-            agency.catalog().addDeparture(tour, DateRange(start, start.addDays(tour->durationDays())));
-            offset += 10;
+            std::cout << " [" << defaultValue << "]";
+        }
+        std::cout << ": ";
+
+        std::string line;
+        std::getline(std::cin, line);
+        const std::size_t first = line.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos)
+        {
+            return defaultValue;
+        }
+        const std::size_t last = line.find_last_not_of(" \t\r\n");
+        return line.substr(first, last - first + 1);
+    }
+
+    int promptInt(const std::string &message, int defaultValue = kNoDefault)
+    {
+        std::string hint = message;
+        if (defaultValue != kNoDefault)
+        {
+            hint += " (по умолчанию " + std::to_string(defaultValue) + ")";
         }
 
-        // Офис компании и сотрудники
-        auto manager = std::make_shared<Manager>(1, makePerson("Ольга", "Руководитель", 1980), Money(500000),
-                                                 today.addDays(-730), "Отдел продаж и обслуживания", 25);
-        Office office("Центральный офис в Москве", Address("Россия", "Москва", "ул. Тверская, д. 1", "125009"), manager);
-        office.hire(guideElena);
-        office.hire(accountant);
-        agency.addOffice(office);
+        const std::string text = prompt(hint);
+        if (text.empty())
+        {
+            if (defaultValue != kNoDefault)
+            {
+                return defaultValue;
+            }
+            throw TravelException("Ожидалось целое число, но ввод пуст");
+        }
 
-        // Промокоды
-        agency.addDiscount(Discount("WELCOME10", 10, DateRange(today.addDays(-30), today.addDays(365)), 100));
-        agency.addDiscount(Discount("SUMMER2026", 15, DateRange(today.addDays(-30), today.addDays(365)), 50));
-        agency.addDiscount(Discount("VIP20", 20, DateRange(today.addDays(-30), today.addDays(365)), 20));
+        try
+        {
+            return std::stoi(text);
+        }
+        catch (const std::exception &)
+        {
+            throw TravelException("Ожидалось целое число, получено: '" + text + "'");
+        }
+    }
 
-        // Клиенты
-        auto c1 = makeCustomer(1, "Иван", "Петров", 1990, "ivan.petrov@mail.ru", "+7 916 111 22 33", "P1778899", today);
-        auto c2 = makeCustomer(2, "Анна", "Смирнова", 1993, "anna.smirnova@yandex.ru", "+7 926 444 55 66", "P2889900", today);
-        auto c3 = makeCustomer(3, "Сергей", "Иванов", 1985, "sergey.ivanov@gmail.com", "+7 903 777 88 99", "P3990011", today);
+    long long promptUsdCents(const std::string &message, long long defaultUsd)
+    {
+        const int amountUsd = promptInt(message + ", USD", static_cast<int>(defaultUsd));
+        if (amountUsd < 0)
+        {
+            throw TravelException("Сумма не может быть отрицательной");
+        }
+        return static_cast<long long>(amountUsd) * kCentsPerUsd;
+    }
 
-        // Бонусы и виза для Анны
-        c2->loyalty().earnPoints(Money(60000)); // серебряный уровень
-        c2->addVisa(Visa("IT", "Schengen Type C", DateRange(today.addDays(-30), today.addDays(150))));
+    Date promptDate(const std::string &message, const Date &defaultDate)
+    {
+        const std::string text = prompt(message + " (ГГГГ-ММ-ДД)", defaultDate.toString());
 
-        agency.registerCustomer(c1);
-        agency.registerCustomer(c2);
-        agency.registerCustomer(c3);
+        std::istringstream stream(text);
+        int year = 0;
+        int month = 0;
+        int day = 0;
+        char firstDash = 0;
+        char secondDash = 0;
+        if (!(stream >> year >> firstDash >> month >> secondDash >> day) || firstDash != '-' || secondDash != '-' ||
+            month < 1 || month > 12 || day < 1 || day > 31)
+        {
+            throw TravelException("Ожидалась дата в формате ГГГГ-ММ-ДД, получено: '" + text + "'");
+        }
+        return Date(year, static_cast<unsigned>(month), static_cast<unsigned>(day));
+    }
 
-        // Демо-бронирование
-        auto demoBooking = agency.createBooking(1, 2, 1, today.addDays(-5));
-        agency.payBooking(demoBooking->id(), Money(15000), PaymentMethod::Card, today.addDays(-3));
+    bool promptYesNo(const std::string &message, bool defaultValue)
+    {
+        const std::string text = prompt(message + (defaultValue ? " [Y/n]" : " [y/N]"));
+        if (text.empty())
+        {
+            return defaultValue;
+        }
+        return text == "y" || text == "Y" || text == "yes" || text == "Yes" ||
+               text == "д" || text == "Д" || text == "да" || text == "Да";
+    }
 
-        // Демо-отзывы
-        agency.addReview(Review(c2, agency.catalog().findTour(1), 5,
-                                "Прекрасный отель Sea Breeze и великолепный снорклинг! Всё организовано безупречно."));
-        agency.addReview(Review(c1, agency.catalog().findTour(2), 4,
-                                "Очень насыщенный маршрут по Стамбулу. Гид Елена — настоящий профессионал."));
+    std::vector<std::string> splitByComma(const std::string &text)
+    {
+        std::vector<std::string> parts;
+        std::istringstream stream(text);
+        std::string part;
+        while (std::getline(stream, part, ','))
+        {
+            const std::size_t first = part.find_first_not_of(" \t");
+            if (first == std::string::npos)
+            {
+                continue;
+            }
+            const std::size_t last = part.find_last_not_of(" \t");
+            parts.push_back(part.substr(first, last - first + 1));
+        }
+        return parts;
+    }
 
-        // Демо-жалоба
-        agency.fileComplaint(1, demoBooking->id(), "Хотелось бы иметь чуть больше свободного времени во второй день тура.");
+    Date currentDate()
+    {
+        const std::time_t now = std::time(nullptr);
+        const std::tm *local = std::localtime(&now);
+        return Date(local->tm_year + 1900,
+                    static_cast<unsigned>(local->tm_mon + 1),
+                    static_cast<unsigned>(local->tm_mday));
+    }
 
-        return {agency, accountant, today};
+    void printBanner(const std::string &title)
+    {
+        std::cout << "\n======================================================================\n"
+                  << "  " << title << "\n"
+                  << "======================================================================\n";
+    }
+
+    void printSectionHeader(const std::string &title)
+    {
+        constexpr int kLineWidth = 64;
+        const int dashCount = std::max(0, kLineWidth - static_cast<int>(title.size()));
+        std::cout << "\n--- " << title << " " << std::string(static_cast<std::size_t>(dashCount), '-') << "\n";
+    }
+
+    void pause()
+    {
+        std::cout << "\nНажмите Enter, чтобы вернуться в главное меню...";
+        std::string line;
+        std::getline(std::cin, line);
     }
 
     std::string methodToString(PaymentMethod method)
@@ -220,6 +255,21 @@ namespace
             return "Туристический ваучер";
         }
         return "Неизвестно";
+    }
+
+    PaymentMethod methodFromChoice(int choice)
+    {
+        switch (choice)
+        {
+        case 2:
+            return PaymentMethod::Cash;
+        case 3:
+            return PaymentMethod::BankTransfer;
+        case 4:
+            return PaymentMethod::Voucher;
+        default:
+            return PaymentMethod::Card;
+        }
     }
 
     std::string bookingStatusToStringRu(BookingStatus status)
@@ -240,157 +290,545 @@ namespace
         return "Неизвестно";
     }
 
-    PaymentMethod methodFromChoice(int choice)
+    std::string join(const std::vector<std::string> &values)
+    {
+        std::string result;
+        for (std::size_t i = 0; i < values.size(); ++i)
+        {
+            if (i > 0)
+            {
+                result += ", ";
+            }
+            result += values[i];
+        }
+        return result;
+    }
+
+    Person makeEmployeePerson(const std::string &role)
+    {
+        const std::string firstName = prompt(role + ": имя", "Сотрудник");
+        const std::string lastName = prompt(role + ": фамилия", "Компании");
+        const int birthYear = promptInt(role + ": год рождения", kDefaultBirthYear);
+        return Person(firstName, lastName, Date(birthYear, 1, 1),
+                      ContactInfo("employee@company.example", "+7 900 000 00 00"),
+                      Address("Россия", "Москва", "ул. Тверская, д. 1", "125009"));
+    }
+
+    std::shared_ptr<Accountant> createAccountant(int employeeId, const Date &today)
+    {
+        const Person person = makeEmployeePerson("Бухгалтер");
+        const int salaryUsd = promptInt("Оклад бухгалтера, USD", kDefaultAccountantSalaryUsd);
+        const std::string certificate = prompt("Номер сертификата бухгалтера",
+                                               "ACC-" + std::to_string(today.year()) + "-" + std::to_string(employeeId));
+        return std::make_shared<Accountant>(employeeId, person,
+                                            Money(static_cast<long long>(salaryUsd) * kCentsPerUsd),
+                                            today, certificate);
+    }
+
+    std::shared_ptr<Manager> createManager(int employeeId, const Date &today)
+    {
+        const Person person = makeEmployeePerson("Руководитель");
+        const int salaryUsd = promptInt("Оклад руководителя, USD", kDefaultManagerSalaryUsd);
+        const std::string department = prompt("Отдел руководителя", "Продажи");
+        const int discountLimit = promptInt("Лимит скидки руководителя, %", kDefaultManagerDiscountLimit);
+        return std::make_shared<Manager>(employeeId, person,
+                                         Money(static_cast<long long>(salaryUsd) * kCentsPerUsd),
+                                         today, department, discountLimit);
+    }
+
+    TourGuidePtr createGuide(int employeeId, const Date &today)
+    {
+        const Person person = makeEmployeePerson("Гид");
+        const int salaryUsd = promptInt("Оклад гида, USD", kDefaultGuideSalaryUsd);
+        const std::string languagesText = prompt("Языки гида через запятую", "Русский, English");
+        const int dailyRateUsd = promptInt("Ставка гида за день, USD", kDefaultGuideDailyRateUsd);
+        return std::make_shared<TourGuide>(employeeId, person,
+                                           Money(static_cast<long long>(salaryUsd) * kCentsPerUsd),
+                                           today, splitByComma(languagesText),
+                                           Money(static_cast<long long>(dailyRateUsd) * kCentsPerUsd));
+    }
+
+    CustomerPtr createCustomer(int customerId, const Date &today)
+    {
+        const std::string firstName = prompt("Имя клиента", "Клиент");
+        const std::string lastName = prompt("Фамилия клиента", std::to_string(customerId));
+        const int birthYear = promptInt("Год рождения клиента", kDefaultBirthYear);
+        const std::string email = prompt("Email клиента", firstName + "." + lastName + "@example.com");
+        const std::string phone = prompt("Телефон клиента", "+7 900 000 00 00");
+        const std::string country = prompt("Страна клиента", "Россия");
+        const std::string city = prompt("Город клиента", "Москва");
+        const std::string street = prompt("Улица и дом клиента", "ул. Тверская, д. 1");
+        const std::string passportNumber = prompt("Номер паспорта", "P" + std::to_string(customerId) + "000001");
+        const std::string passportCountry = prompt("Страна выдачи паспорта", "RU");
+
+        const Person person(firstName, lastName, Date(birthYear, 1, 1), ContactInfo(email, phone),
+                            Address(country, city, street, "125009"));
+        const Passport passport(passportNumber, passportCountry, firstName + " " + lastName,
+                                today.addDays(kPassportValidityYears * 365));
+        return std::make_shared<Customer>(customerId, person, passport);
+    }
+
+    TourGuidePtr findGuide(const std::vector<TourGuidePtr> &guides, int employeeId)
+    {
+        for (const auto &guide : guides)
+        {
+            if (guide->employeeId() == employeeId)
+            {
+                return guide;
+            }
+        }
+        throw TravelException("Гид с ID " + std::to_string(employeeId) + " не найден");
+    }
+
+    std::vector<unsigned> promptBestMonths()
+    {
+        const std::string text = prompt("Лучшие месяцы (1-12 через запятую)", "1,2,3,4,5,6,7,8,9,10,11,12");
+        std::vector<unsigned> months;
+        for (const std::string &part : splitByComma(text))
+        {
+            std::istringstream stream(part);
+            int month = 0;
+            if (!(stream >> month) || month < 1 || month > 12)
+            {
+                throw TravelException("Месяц должен быть от 1 до 12: '" + part + "'");
+            }
+            months.push_back(static_cast<unsigned>(month));
+        }
+        if (months.empty())
+        {
+            for (unsigned month = 1; month <= 12; ++month)
+            {
+                months.push_back(month);
+            }
+        }
+        return months;
+    }
+
+    Attraction promptAttraction()
+    {
+        const std::string name = prompt("Название достопримечательности", "Главная достопримечательность");
+        const long long ticketCents = promptUsdCents("Цена билета", 10);
+        const int visitMinutes = promptInt("Рекомендуемое время посещения, минут", 60);
+        const bool indoor = promptYesNo("Достопримечательность в помещении", false);
+        return Attraction(name, Money(ticketCents), visitMinutes, indoor);
+    }
+
+    Tour buildBaseTour(int tourId)
+    {
+        const std::string name = prompt("Название тура", "Новый тур");
+        const std::string countryName = prompt("Страна назначения", "Россия");
+        const std::string countryCode = prompt("Код страны (ISO)", "RU");
+        const std::string countryCurrency = prompt("Валюта страны", "USD");
+        const bool visaRequired = promptYesNo("Нужна ли виза для въезда", false);
+        const Country country(countryName, countryCode, countryCurrency, visaRequired);
+
+        const std::string cityName = prompt("Город назначения", "Москва");
+        const int utcOffset = promptInt("Часовой пояс города (UTC, часы)", 3);
+        const City city(cityName, country, utcOffset);
+
+        const std::string description = prompt("Описание направления", "Туристическое направление");
+        Destination destination(city, description, promptBestMonths());
+        if (promptYesNo("Добавить достопримечательность", false))
+        {
+            destination.addAttraction(promptAttraction());
+        }
+
+        const int durationDays = promptInt("Длительность тура, дней", kDefaultTourDays);
+        const long long priceCents = promptUsdCents("Цена на одного человека", kDefaultTourPriceUsd);
+        const int capacity = promptInt("Максимальный размер группы", kDefaultCapacity);
+
+        Itinerary itinerary(name + " — программа тура", city);
+        const std::string program = prompt("Краткое описание программы (можно пропустить)", "");
+        if (!program.empty())
+        {
+            itinerary.addDay(ItineraryDay(1, program));
+        }
+
+        return Tour(tourId, name, destination, durationDays, Money(priceCents), capacity, itinerary);
+    }
+
+    TourPtr buildBeachTour(Tour base)
+    {
+        const City city = base.destination().city();
+        const std::string beachName = prompt("Название пляжа", "Городской пляж");
+        const std::string hotelName = prompt("Название отеля", "Курортный отель");
+        const int stars = promptInt("Количество звёзд отеля", kDefaultHotelStars);
+        const std::string street = prompt("Адрес отеля", "Набережная, д. 1");
+
+        const auto hotel = std::make_shared<Hotel>(
+            hotelName, stars, Address(city.country().name(), city.name(), street, "000000"));
+        const long long defaultRoomUsd =
+            base.basePrice().cents() / (kCentsPerUsd * std::max(1, base.durationDays()));
+        const long long roomPriceCents = promptUsdCents("Цена номера за ночь", defaultRoomUsd);
+        hotel->addRoom(kDefaultHotelRoomNumber, base.capacity(), Money(roomPriceCents));
+
+        const bool snorkeling = promptYesNo("Включить снорклинг в стоимость", false);
+        return std::make_shared<BeachTour>(std::move(base), beachName, hotel, snorkeling);
+    }
+
+    std::string cabinCategoryFromChoice(int choice)
     {
         switch (choice)
         {
+        case 1:
+            return "Inside";
         case 2:
-            return PaymentMethod::Cash;
+            return "Ocean";
         case 3:
-            return PaymentMethod::BankTransfer;
-        case 4:
-            return PaymentMethod::Voucher;
+            return "Suite";
         default:
-            return PaymentMethod::Card;
+            throw TravelException("Категория каюты должна быть 1, 2 или 3");
         }
     }
 
-    std::string prompt(const std::string &msg)
+    TourPtr buildCruiseTour(Tour base)
     {
-        std::cout << msg << ": ";
-        std::string line;
-        std::getline(std::cin, line);
-        // trim leading/trailing whitespace
-        const auto strBegin = line.find_first_not_of(" \t\r\n");
-        if (strBegin == std::string::npos)
+        const City destinationCity = base.destination().city();
+        const std::string shipName = prompt("Название лайнера", "Ocean Star");
+        const int cabins = promptInt("Количество кают", 100);
+        const int decks = promptInt("Количество палуб", 5);
+        const int shipCapacity = promptInt("Вместимость лайнера, пассажиров", base.capacity());
+        if (cabins <= 0 || decks <= 0 || shipCapacity <= 0)
         {
-            return "";
+            throw TravelException("Количество кают, палуб и мест должно быть положительным");
         }
-        const auto strEnd = line.find_last_not_of(" \t\r\n");
-        return line.substr(strBegin, strEnd - strBegin + 1);
-    }
 
-    int promptInt(const std::string &msg, int defaultVal = -1)
-    {
-        std::string hint = msg;
-        if (defaultVal != -1)
+        const int categoryChoice = promptInt("Категория каюты (1 — Inside, 2 — Ocean, 3 — Suite)", 2);
+        const std::string category = cabinCategoryFromChoice(categoryChoice);
+        const auto ship = std::make_shared<Ship>(shipName, cabins, decks, shipCapacity);
+
+        std::vector<City> ports;
+        const std::string portsText = prompt("Порты захода через запятую (можно пропустить)", "");
+        for (const std::string &portName : splitByComma(portsText))
         {
-            hint += " [по умолчанию " + std::to_string(defaultVal) + "]";
+            ports.emplace_back(portName, destinationCity.country(), 0);
         }
-        std::string text = prompt(hint);
-        if (text.empty() && defaultVal != -1)
+        return std::make_shared<CruiseTour>(std::move(base), ship, category, ports);
+    }
+
+    TourPtr buildSkiTour(Tour base)
+    {
+        const City city = base.destination().city();
+        const std::string resort = prompt("Название горнолыжного курорта", city.name());
+        const long long skiPassCents = promptUsdCents("Ски-пасс за день", kDefaultSkiPassUsd);
+        const int difficulty = promptInt("Сложность трасс (1-5)", kDefaultSkiDifficulty);
+        if (difficulty < kMinDifficulty || difficulty > kMaxDifficulty)
         {
-            return defaultVal;
+            throw TravelException("Сложность должна быть от 1 до 5");
         }
-        try
+        return std::make_shared<SkiTour>(std::move(base), resort, Money(skiPassCents), difficulty);
+    }
+
+    TourPtr buildExcursionTour(AppState &state, Tour base)
+    {
+        if (state.guides.empty())
         {
-            return std::stoi(text);
+            throw TravelException("Сначала добавьте гида (пункт 24 главного меню)");
         }
-        catch (const std::exception &)
+        std::cout << "\nДоступные гиды:\n";
+        for (const auto &guide : state.guides)
         {
-            throw TravelException("Ожидалось целое число, получено: '" + text + "'");
-        }
-    }
-
-    Date currentDate()
-    {
-        std::time_t now = std::time(nullptr);
-        std::tm *local = std::localtime(&now);
-        return Date(local->tm_year + 1900,
-                    static_cast<unsigned>(local->tm_mon + 1),
-                    static_cast<unsigned>(local->tm_mday));
-    }
-
-    void printBanner(const std::string &title)
-    {
-        std::cout << "\n======================================================================\n"
-                  << "  " << title << "\n"
-                  << "======================================================================\n";
-    }
-
-    void printSectionHeader(const std::string &title)
-    {
-        std::cout << "\n--- " << title << " "
-                  << std::string(std::max(0, 64 - static_cast<int>(title.size())), '-') << "\n";
-    }
-
-    // Меню и операции
-
-    void showMainMenu(const TravelCompany &agency, const Date &today)
-    {
-        std::cout << "        Текущая системная дата: " << today.toString() << "\n"
-                  << "  1. Список всех туров и доступных отправлений\n"
-                  << "  2. Поиск туров по городу назначения\n"
-                  << "  3. Подбор туров по максимальному бюджету\n"
-                  << "  4. Детальная программа тура (маршрут, отель, гид, лайнер)\n"
-                  << "  5. Список зарегистрированных клиентов\n"
-                  << "  6. Карточка клиента (паспорт, баланс лояльности, визы, сообщения)\n"
-                  << "  7. Регистрация нового клиента\n"
-                  << "  8. Оформление / привязка визы клиенту\n"
-                  << "  9. Создать новое бронирование тура\n"
-                  << " 10. Детальная информация о бронировании и счёт-фактура (Invoice)\n"
-                  << " 11. Оплатить бронирование (карта / наличные / перевод / ваучер)\n"
-                  << " 12. Оформить и прикрепить страховой полис к бронированию\n"
-                  << " 13. Применить промокод на скидку\n"
-                  << " 14. Отменить бронирование с расчётом возврата средств\n"
-                  << " 15. Оставить отзыв о туре и посмотреть средний рейтинг\n"
-                  << " 16. Подать официальную жалобу по бронированию\n"
-                  << " 17. Рассмотреть жалобу (зафиксировать решение менеджера)\n"
-                  << " 18. Статус обращений и количество открытых жалоб\n"
-                  << " 19. Отчёт по продажам за период (SalesReport)\n"
-                  << " 20. Финансовая книга компании Ledger (баланс, доходы, расходы)\n"
-                  << " 21. Офисы компании, руководство и штат сотрудников\n"
-                  << "  0. Выход из программы\n";
-    }
-
-    void handleListDepartures(const TravelCompany &agency)
-    {
-        printSectionHeader("КАТАЛОГ ТУРОВ И ОТПРАВЛЕНИЙ");
-        const auto &departures = agency.catalog().departures();
-        if (departures.empty())
-        {
-            std::cout << "В каталоге пока нет доступных отправлений.\n";
-            return;
+            std::cout << "  #" << guide->employeeId() << " " << guide->fullName()
+                      << " (языки: " << join(guide->languages()) << ")\n";
         }
 
+        const int guideId = promptInt("ID гида");
+        const TourGuidePtr guide = findGuide(state.guides, guideId);
+        const std::string language = prompt("Язык экскурсии", "Русский");
+        const int walkingKm = promptInt("Пешая часть экскурсии, км", kDefaultWalkingKm);
+        return std::make_shared<ExcursionTour>(std::move(base), guide, language, walkingKm);
+    }
+
+    void printTourList(const std::vector<TourPtr> &tours)
+    {
         std::cout << std::left
-                  << std::setw(6) << "ID отпр."
-                  << std::setw(6) << "ID тура"
-                  << std::setw(24) << "Название тура"
-                  << std::setw(15) << "Город"
-                  << std::setw(26) << "Даты поездки"
-                  << std::setw(14) << "Цена / чел."
-                  << std::setw(12) << "Своб. мест"
+                  << std::setw(5) << "ID"
+                  << std::setw(30) << "Название"
+                  << std::setw(20) << "Город"
+                  << std::setw(12) << "Дней"
+                  << std::setw(18) << "Цена / чел."
                   << "\n"
-                  << std::string(103, '-') << "\n";
-
-        for (const auto &dep : departures)
+                  << std::string(85, '-') << "\n";
+        for (const auto &tour : tours)
         {
-            const auto tour = dep->tour();
             std::cout << std::left
-                      << std::setw(6) << dep->id()
-                      << std::setw(6) << tour->id()
-                      << std::setw(24) << tour->name()
-                      << std::setw(15) << tour->destination().city().name()
-                      << std::setw(26) << dep->period().toString()
-                      << std::setw(14) << tour->pricePerPerson().toString()
-                      << std::setw(4) << dep->freeSeats() << " из " << tour->capacity()
-                      << (dep->isSoldOut() ? " [МЕСТ НЕТ]" : "")
+                      << std::setw(5) << tour->id()
+                      << std::setw(30) << tour->name()
+                      << std::setw(20) << tour->destination().city().name()
+                      << std::setw(12) << tour->durationDays()
+                      << std::setw(18) << tour->pricePerPerson().toString()
                       << "\n";
         }
     }
 
-    void handleSearchByCity(const TravelCompany &agency)
+    void showDepartures(const std::vector<DeparturePtr> &departures)
+    {
+        if (departures.empty())
+        {
+            std::cout << "\nОтправлений пока нет. Добавьте их через пункт 23 главного меню.\n";
+            return;
+        }
+
+        std::cout << "\n[ОТПРАВЛЕНИЯ]:\n"
+                  << std::left
+                  << std::setw(8) << "ID"
+                  << std::setw(8) << "Тур"
+                  << std::setw(30) << "Название"
+                  << std::setw(26) << "Даты поездки"
+                  << std::setw(18) << "Свободно"
+                  << "\n"
+                  << std::string(90, '-') << "\n";
+        for (const auto &departure : departures)
+        {
+            std::cout << std::left
+                      << std::setw(8) << departure->id()
+                      << std::setw(8) << departure->tour()->id()
+                      << std::setw(30) << departure->tour()->name()
+                      << std::setw(26) << departure->period().toString()
+                      << std::setw(4) << departure->freeSeats() << " из " << departure->tour()->capacity()
+                      << (departure->isSoldOut() ? " [МЕСТ НЕТ]" : "")
+                      << "\n";
+        }
+    }
+
+    void printItinerary(const Itinerary &itinerary)
+    {
+        std::cout << "\n[ПРОГРАММА ПО ДНЯМ (" << itinerary.title() << ")]:\n";
+        if (itinerary.days().empty())
+        {
+            std::cout << "  Программа пока не заполнена.\n";
+            return;
+        }
+
+        for (const auto &day : itinerary.days())
+        {
+            std::cout << "  • День " << day.dayNumber() << ": " << day.notes()
+                      << " (занятость: " << day.totalMinutes() << " мин., сумма доп. затрат: "
+                      << day.totalCost().toString() << ")\n";
+            for (const auto &activity : day.activities())
+            {
+                std::cout << "      - " << activity.describe()
+                          << (activity.outdoor() ? " [на свежем воздухе]" : " [в помещении]") << "\n";
+            }
+        }
+    }
+
+    void printAttractions(const Destination &destination)
+    {
+        if (destination.attractions().empty())
+        {
+            return;
+        }
+
+        std::cout << "\n[ДОСТОПРИМЕЧАТЕЛЬНОСТИ В НАПРАВЛЕНИИ]:\n";
+        for (const auto &attraction : destination.attractions())
+        {
+            std::cout << "  • " << attraction.name() << " (билет: " << attraction.ticketPrice().toString()
+                      << ", рекомендуемое время: " << attraction.visitMinutes() << " мин.)\n";
+        }
+    }
+
+    void printTourSpecifics(const TourPtr &tour)
+    {
+        if (const auto beach = std::dynamic_pointer_cast<BeachTour>(tour))
+        {
+            std::cout << "\n[ПЛЯЖНЫЙ ТУР]\n"
+                      << "Пляж:        " << beach->beachName() << "\n"
+                      << "Отель:       " << beach->hotel()->name() << " (" << beach->hotel()->stars() << " звёзд)\n"
+                      << "Адрес отеля: " << beach->hotel()->address().fullText() << "\n"
+                      << "Снорклинг:   " << (beach->snorkelingIncluded() ? "Включён в стоимость" : "Не включён") << "\n";
+            return;
+        }
+
+        if (const auto excursion = std::dynamic_pointer_cast<ExcursionTour>(tour))
+        {
+            std::cout << "\n[ЭКСКУРСИОННЫЙ ТУР]\n"
+                      << "Гид:           " << excursion->guide()->fullName() << "\n"
+                      << "Язык тура:     " << excursion->language() << "\n"
+                      << "Пеший маршрут: " << excursion->walkingKm() << " км "
+                      << (excursion->isEasy() ? "(лёгкий уровень)" : "(насыщенный маршрут)") << "\n";
+            return;
+        }
+
+        if (const auto cruise = std::dynamic_pointer_cast<CruiseTour>(tour))
+        {
+            std::cout << "\n[КРУИЗНЫЙ ТУР]\n"
+                      << "Лайнер:      " << cruise->ship()->name()
+                      << " (вместимость " << cruise->ship()->passengerCapacity() << " пасс., "
+                      << cruise->ship()->cabins() << " кают, " << cruise->ship()->decks() << " палуб)\n"
+                      << "Класс каюты: " << cruise->cabinCategory() << "\n"
+                      << "Порты захода: ";
+            for (std::size_t i = 0; i < cruise->ports().size(); ++i)
+            {
+                std::cout << (i > 0 ? ", " : "") << cruise->ports()[i].name();
+            }
+            std::cout << "\n";
+            return;
+        }
+
+        if (const auto ski = std::dynamic_pointer_cast<SkiTour>(tour))
+        {
+            std::cout << "\n[ГОРНОЛЫЖНЫЙ ТУР]\n"
+                      << "Курорт:          " << ski->resortName() << "\n"
+                      << "Сложность:       Уровень " << ski->difficulty() << " из 5 "
+                      << (ski->isForBeginners() ? "(подходит новичкам)" : "(для опытных лыжников)") << "\n"
+                      << "Ски-пасс/день:   " << ski->skiPassPricePerDay().toString() << "\n"
+                      << "Ски-пасс на тур: " << ski->skiPassCost().toString() << "\n";
+        }
+    }
+
+    void handleCreateCompany(AppState &state)
+    {
+        printSectionHeader("СОЗДАНИЕ ТУРИСТИЧЕСКОЙ КОМПАНИИ");
+        const std::string name = prompt("Название компании", "Моя туристическая компания");
+        const int freeDays = promptInt("Дней до поездки для бесплатной отмены", kDefaultFreeDays);
+        const int earlyPenalty = promptInt("Штраф при ранней отмене, %", kDefaultEarlyPenalty);
+        const int latePenalty = promptInt("Штраф при поздней отмене, %", kDefaultLatePenalty);
+        const int lateThreshold = promptInt("Порог поздней отмены, дней до поездки", kDefaultLateThreshold);
+        if (freeDays < 0 || earlyPenalty < 0 || earlyPenalty > 100 ||
+            latePenalty < 0 || latePenalty > 100 || lateThreshold < 0)
+        {
+            throw TravelException("Параметры политики отмены должны быть в диапазоне 0..100");
+        }
+
+        const std::shared_ptr<Accountant> accountant = createAccountant(state.nextEmployeeId, state.today);
+        ++state.nextEmployeeId;
+
+        const CancellationPolicy policy(freeDays, earlyPenalty, latePenalty, lateThreshold);
+        state.accountant = accountant;
+        state.agency = std::make_unique<TravelCompany>(name, policy, accountant);
+
+        std::cout << "\n[OK] Компания «" << name << "» создана. Бухгалтер: " << accountant->fullName() << ".\n"
+                  << "Теперь добавьте тур (пункт 22), отправление (пункт 23) и клиента (пункт 7).\n";
+    }
+
+    void handleAddTour(AppState &state)
+    {
+        printSectionHeader("ДОБАВЛЕНИЕ ТУРА");
+        std::cout << "  1. Пляжный\n"
+                  << "  2. Экскурсионный\n"
+                  << "  3. Круизный\n"
+                  << "  4. Горнолыжный\n";
+        const int type = promptInt("Тип тура (1..4)", 1);
+        const int tourId = static_cast<int>(state.agency->catalog().tours().size()) + 1;
+
+        Tour base = buildBaseTour(tourId);
+        TourPtr tour;
+        switch (type)
+        {
+        case 1:
+            tour = buildBeachTour(std::move(base));
+            break;
+        case 2:
+            tour = buildExcursionTour(state, std::move(base));
+            break;
+        case 3:
+            tour = buildCruiseTour(std::move(base));
+            break;
+        case 4:
+            tour = buildSkiTour(std::move(base));
+            break;
+        default:
+            throw TravelException("Тип тура должен быть от 1 до 4");
+        }
+
+        state.agency->catalog().addTour(tour);
+        std::cout << "\n[OK] Тур #" << tour->id() << " «" << tour->name() << "» добавлен в каталог.\n"
+                  << "Теперь добавьте отправление (пункт 23 главного меню).\n";
+    }
+
+    void handleAddDeparture(AppState &state)
+    {
+        printSectionHeader("ДОБАВЛЕНИЕ ОТПРАВЛЕНИЯ");
+        const auto &tours = state.agency->catalog().tours();
+        if (tours.empty())
+        {
+            std::cout << "Сначала добавьте тур (пункт 22 главного меню).\n";
+            return;
+        }
+
+        printTourList(tours);
+        const int tourId = promptInt("ID тура");
+        const TourPtr tour = state.agency->catalog().findTour(tourId);
+        const Date start = promptDate("Дата начала поездки", state.today.addDays(kDefaultDepartureOffsetDays));
+        const DateRange period(start, start.addDays(tour->durationDays()));
+        const DeparturePtr departure = state.agency->catalog().addDeparture(tour, period);
+
+        std::cout << "\n[OK] Отправление #" << departure->id() << " для тура «" << tour->name() << "»: "
+                  << period.toString() << ", свободно мест: " << departure->freeSeats() << ".\n";
+    }
+
+    void handleAddGuide(AppState &state)
+    {
+        printSectionHeader("ДОБАВЛЕНИЕ ГИДА");
+        const TourGuidePtr guide = createGuide(state.nextEmployeeId, state.today);
+        ++state.nextEmployeeId;
+        state.guides.push_back(guide);
+        std::cout << "\n[OK] Гид #" << guide->employeeId() << " " << guide->fullName()
+                  << " добавлен (языки: " << join(guide->languages()) << ").\n";
+    }
+
+    void handleAddOffice(AppState &state)
+    {
+        printSectionHeader("ДОБАВЛЕНИЕ ОФИСА");
+        const std::string name = prompt("Название офиса", "Центральный офис");
+        const std::string country = prompt("Страна офиса", "Россия");
+        const std::string city = prompt("Город офиса", "Москва");
+        const std::string street = prompt("Улица и дом офиса", "ул. Тверская, д. 1");
+        const std::string postalCode = prompt("Индекс офиса", "125009");
+
+        const std::shared_ptr<Manager> manager = createManager(state.nextEmployeeId, state.today);
+        ++state.nextEmployeeId;
+
+        Office office(name, Address(country, city, street, postalCode), manager);
+        office.hire(state.accountant);
+        for (const auto &guide : state.guides)
+        {
+            office.hire(guide);
+        }
+        state.agency->addOffice(office);
+
+        std::cout << "\n[OK] Офис «" << name << "» добавлен. Руководитель: " << manager->fullName()
+                  << ", сотрудников в офисе: " << office.staffCount() << ".\n";
+    }
+
+    void handleAddDiscount(AppState &state)
+    {
+        printSectionHeader("ДОБАВЛЕНИЕ ПРОМОКОДА");
+        const std::string code = prompt("Промокод", "PROMO10");
+        const int percent = promptInt("Размер скидки, %", kDefaultDiscountPercent);
+        const Date start = promptDate("Действует с", state.today);
+        const Date end = promptDate("Действует до", state.today.addDays(kDefaultReportDays));
+        const int usageLimit = promptInt("Лимит использований", kDefaultDiscountUses);
+
+        state.agency->addDiscount(Discount(code, percent, DateRange(start, end), usageLimit));
+        std::cout << "\n[OK] Промокод «" << code << "» на " << percent << "% добавлен.\n";
+    }
+
+    void handleShowCatalog(const AppState &state)
+    {
+        printSectionHeader("КАТАЛОГ ТУРОВ И ОТПРАВЛЕНИЙ");
+        const TourCatalog &catalog = state.agency->catalog();
+        if (catalog.tours().empty())
+        {
+            std::cout << "Каталог пуст. Добавьте тур через пункт 22 главного меню.\n";
+            return;
+        }
+        printTourList(catalog.tours());
+        showDepartures(catalog.departures());
+    }
+
+    void handleSearchByCity(const AppState &state)
     {
         printSectionHeader("ПОИСК ТУРОВ ПО ГОРОДУ");
-        std::string city = prompt("Введите город назначения (напр., Rome, Hurghada, Istanbul, Kyoto, Innsbruck)");
+        const std::string city = prompt("Введите город назначения");
         if (city.empty())
         {
             std::cout << "Город не указан.\n";
             return;
         }
 
-        auto results = agency.catalog().findByCity(city);
+        const auto results = state.agency->catalog().findByCity(city);
         if (results.empty())
         {
             std::cout << "Туров в город «" << city << "» не найдено.\n";
@@ -400,20 +838,20 @@ namespace
         std::cout << "Найдено туров: " << results.size() << "\n";
         for (const auto &tour : results)
         {
-            std::cout << " • [# " << tour->id() << "] " << tour->name()
+            std::cout << " • [#" << tour->id() << "] " << tour->name()
                       << " (" << tour->durationDays() << " дн., "
-                      << tour->pricePerPerson().toString() << "/чел., вместимость: "
-                      << tour->capacity() << " чел.)\n";
+                      << tour->pricePerPerson().toString() << "/чел., мест: "
+                      << tour->capacity() << ")\n";
         }
     }
 
-    void handleSearchByBudget(const TravelCompany &agency)
+    void handleSearchByBudget(const AppState &state)
     {
         printSectionHeader("ПОДБОР ТУРОВ ПО БЮДЖЕТУ");
-        int maxUsd = promptInt("Введите максимальный бюджет на человека в USD (целое число)");
-        Money maxMoney(static_cast<long long>(maxUsd) * 100);
+        const int maxUsd = promptInt("Введите максимальный бюджет на человека, USD");
+        const Money maxMoney(static_cast<long long>(maxUsd) * kCentsPerUsd);
 
-        auto results = agency.catalog().findAffordable(maxMoney);
+        const auto results = state.agency->catalog().findAffordable(maxMoney);
         if (results.empty())
         {
             std::cout << "В пределах бюджета " << maxMoney.toString() << " туров не найдено.\n";
@@ -423,192 +861,142 @@ namespace
         std::cout << "Туры с ценой не более " << maxMoney.toString() << " (найдено: " << results.size() << "):\n";
         for (const auto &tour : results)
         {
-            std::cout << " • [# " << tour->id() << "] " << tour->name()
+            std::cout << " • [#" << tour->id() << "] " << tour->name()
                       << " — " << tour->pricePerPerson().toString()
                       << " (" << tour->durationDays() << " дн., направление: "
                       << tour->destination().city().name() << ")\n";
         }
     }
 
-    void handleTourDetails(const TravelCompany &agency, const Date &today)
+    void handleTourDetails(const AppState &state)
     {
         printSectionHeader("ДЕТАЛЬНАЯ ПРОГРАММА И ОПИСАНИЕ ТУРА");
-        int tourId = promptInt("Введите ID интересующего тура (1..5)");
-        auto tour = agency.catalog().findTour(tourId);
+        if (state.agency->catalog().tours().empty())
+        {
+            std::cout << "Каталог пуст. Добавьте тур через пункт 22 главного меню.\n";
+            return;
+        }
+
+        const int tourId = promptInt("Введите ID тура");
+        const TourPtr tour = state.agency->catalog().findTour(tourId);
 
         std::cout << "\n=== ТУР #" << tour->id() << ": " << tour->name() << " ===\n"
                   << "Направление:        " << tour->destination().city().name() << ", "
                   << tour->destination().city().country().name() << "\n"
                   << "Описание местности: " << tour->destination().description() << "\n"
                   << "Продолжительность:  " << tour->durationDays() << " дн.\n"
-                  << "Базовая цена:       " << tour->pricePerPerson().toString() << " на 1 человека\n"
+                  << "Базовая цена:       " << tour->pricePerPerson().toString() << " на человека\n"
                   << "Макс. группа:       " << tour->capacity() << " человек\n"
-                  << "Сезонность на дату: " << (tour->isSuitableForSeason(today) ? "Да, благоприятный сезон" : "Не является основным сезоном") << "\n";
+                  << "Сезонность на дату: "
+                  << (tour->isSuitableForSeason(state.today) ? "благоприятный сезон" : "не основной сезон") << "\n";
 
-        // Специфика подтипа тура
-        if (auto beach = std::dynamic_pointer_cast<BeachTour>(tour))
-        {
-            std::cout << "\n[ПЛЯЖНЫЙ ТУР]\n"
-                      << "Пляж:        " << beach->beachName() << "\n"
-                      << "Отель:       " << beach->hotel()->name() << " (" << beach->hotel()->stars() << " звёзд)\n"
-                      << "Адрес отеля: " << beach->hotel()->address().fullText() << "\n"
-                      << "Снорклинг:   " << (beach->snorkelingIncluded() ? "Включён в стоимость пакета" : "Не включён") << "\n";
-        }
-        else if (auto exc = std::dynamic_pointer_cast<ExcursionTour>(tour))
-        {
-            std::cout << "\n[ЭКСКУРСИОННЫЙ ТУР]\n"
-                      << "Гид:            " << exc->guide()->fullName() << "\n"
-                      << "Язык тура:      " << exc->language() << "\n"
-                      << "Пеший маршрут:  " << exc->walkingKm() << " км "
-                      << (exc->isEasy() ? "(лёгкий уровень сложности)" : "(насыщенный пеший маршрут)") << "\n";
-        }
-        else if (auto cruise = std::dynamic_pointer_cast<CruiseTour>(tour))
-        {
-            std::cout << "\n[КРУИЗНЫЙ ТУР]\n"
-                      << "Лайнер:         " << cruise->ship()->name()
-                      << " (вместимость " << cruise->ship()->passengerCapacity() << " пасс., "
-                      << cruise->ship()->cabins() << " кают, "
-                      << cruise->ship()->decks() << " палуб)\n"
-                      << "Класс каюты:    " << cruise->cabinCategory() << "\n"
-                      << "Порты захода:   ";
-            for (std::size_t i = 0; i < cruise->ports().size(); ++i)
-            {
-                std::cout << (i > 0 ? ", " : "") << cruise->ports()[i].name();
-            }
-            std::cout << "\n";
-        }
-        else if (auto ski = std::dynamic_pointer_cast<SkiTour>(tour))
-        {
-            std::cout << "\n[ГОРНОЛЫЖНЫЙ ТУР]\n"
-                      << "Курорт:         " << ski->resortName() << "\n"
-                      << "Сложность:      Уровень " << ski->difficulty() << " из 5 "
-                      << (ski->isForBeginners() ? "(подходит новичкам)" : "(для опытных лыжников)") << "\n"
-                      << "Ски-пасс/день:  " << ski->skiPassPricePerDay().toString() << "\n"
-                      << "Ски-пасс на тур:" << ski->skiPassCost().toString() << "\n";
-        }
+        printTourSpecifics(tour);
+        printItinerary(tour->itinerary());
+        printAttractions(tour->destination());
 
-        // Программа по дням (Itinerary)
-        std::cout << "\n[ПРОГРАММА ПО ДНЯМ (" << tour->itinerary().title() << ")]:\n";
-        for (const auto &day : tour->itinerary().days())
+        const double rating = state.agency->averageRating(tourId);
+        std::cout << "\nСредний рейтинг тура: ";
+        if (rating > 0.0)
         {
-            std::cout << "  • День " << day.dayNumber() << ": " << day.notes()
-                      << " (занятость: " << day.totalMinutes() << " мин., сумма доп. затрат: "
-                      << day.totalCost().toString() << ")\n";
-            for (const auto &act : day.activities())
-            {
-                std::cout << "      - " << act.describe()
-                          << (act.outdoor() ? " [на свежем воздухе]" : " [в помещении]") << "\n";
-            }
+            std::cout << std::fixed << std::setprecision(1) << rating << " / 5.0\n"
+                      << std::defaultfloat;
         }
-
-        // Достопримечательности
-        const auto &attrs = tour->destination().attractions();
-        if (!attrs.empty())
+        else
         {
-            std::cout << "\n[ДОСТОПРИМЕЧАТЕЛЬНОСТИ В НАПРАВЛЕНИИ]:\n";
-            for (const auto &attr : attrs)
-            {
-                std::cout << "  • " << attr.name() << " (билет: " << attr.ticketPrice().toString()
-                          << ", рекомендуемое время: " << attr.visitMinutes() << " мин.)\n";
-            }
+            std::cout << "Пока нет отзывов\n";
         }
-
-        double rating = agency.averageRating(tourId);
-        std::cout << "\nСредний рейтинг тура по отзывам: "
-                  << (rating > 0.0 ? (std::to_string(rating).substr(0, 4) + " / 5.0") : "Пока нет отзывов") << "\n";
     }
 
-    void handleListCustomers(const TravelCompany &agency)
+    void handleListCustomers(const AppState &state)
     {
         printSectionHeader("СПИСОК ЗАРЕГИСТРИРОВАННЫХ КЛИЕНТОВ");
-        const auto &customers = agency.customers();
+        const auto &customers = state.agency->customers();
         if (customers.empty())
         {
-            std::cout << "Нет зарегистрированных клиентов.\n";
+            std::cout << "Нет зарегистрированных клиентов. Добавьте клиента через пункт 7.\n";
             return;
         }
 
         std::cout << std::left
                   << std::setw(5) << "ID"
-                  << std::setw(22) << "ФИО Клиента"
-                  << std::setw(26) << "Электронная почта"
-                  << std::setw(12) << "Паспорт"
-                  << std::setw(10) << "Уровень"
-                  << std::setw(8) << "Баллы"
-                  << std::setw(10) << "Скидка"
+                  << std::setw(26) << "ФИО клиента"
+                  << std::setw(36) << "Электронная почта"
+                  << std::setw(16) << "Паспорт"
+                  << std::setw(12) << "Уровень"
+                  << std::setw(10) << "Баллы"
+                  << std::setw(12) << "Скидка"
                   << "\n"
-                  << std::string(93, '-') << "\n";
+                  << std::string(117, '-') << "\n";
 
-        for (const auto &c : customers)
+        for (const auto &customer : customers)
         {
             std::cout << std::left
-                      << std::setw(5) << c->customerId()
-                      << std::setw(22) << c->fullName()
-                      << std::setw(26) << c->contact().email()
-                      << std::setw(12) << c->passport().number()
-                      << std::setw(10) << c->loyalty().tier()
-                      << std::setw(8) << c->loyalty().points()
-                      << std::setw(10) << (std::to_string(c->loyalty().discountPercent()) + "%")
+                      << std::setw(5) << customer->customerId()
+                      << std::setw(26) << customer->fullName()
+                      << std::setw(36) << customer->contact().email()
+                      << std::setw(16) << customer->passport().number()
+                      << std::setw(12) << customer->loyalty().tier()
+                      << std::setw(10) << customer->loyalty().points()
+                      << std::setw(12) << (std::to_string(customer->loyalty().discountPercent()) + "%")
                       << "\n";
         }
     }
 
-    void handleCustomerCard(const TravelCompany &agency, const Date &today)
+    void handleCustomerCard(const AppState &state)
     {
         printSectionHeader("КАРТОЧКА КЛИЕНТА");
-        int customerId = promptInt("Введите ID клиента");
-        auto c = agency.findCustomer(customerId);
+        const int customerId = promptInt("Введите ID клиента");
+        const CustomerPtr customer = state.agency->findCustomer(customerId);
 
-        std::cout << "\n=== КЛИЕНТ #" << c->customerId() << ": " << c->fullName() << " ===\n"
-                  << "Дата рождения:       " << c->birthDate().toString() << " (" << c->ageOn(today) << " лет)\n"
-                  << "Email:               " << c->contact().email() << "\n"
-                  << "Телефон:             " << c->contact().phone() << "\n"
-                  << "Адрес проживания:    " << c->address().fullText() << "\n"
+        std::cout << "\n=== КЛИЕНТ #" << customer->customerId() << ": " << customer->fullName() << " ===\n"
+                  << "Дата рождения:       " << customer->birthDate().toString()
+                  << " (" << customer->ageOn(state.today) << " лет)\n"
+                  << "Email:               " << customer->contact().email() << "\n"
+                  << "Телефон:             " << customer->contact().phone() << "\n"
+                  << "Адрес проживания:    " << customer->address().fullText() << "\n"
                   << "\n[ПАСПОРТНЫЕ ДАННЫЕ]:\n"
-                  << "Номер:               " << c->passport().number() << "\n"
-                  << "Страна выдачи:       " << c->passport().issuingCountry() << "\n"
-                  << "ФИО в паспорте:      " << c->passport().holderName() << "\n"
-                  << "Срок действия до:    " << c->passport().expiry().toString()
-                  << " (" << (!c->passport().isExpiredOn(today) ? "Действителен" : "ПРОСРОЧЕН") << ")\n"
+                  << "Номер:               " << customer->passport().number() << "\n"
+                  << "Страна выдачи:       " << customer->passport().issuingCountry() << "\n"
+                  << "ФИО в паспорте:      " << customer->passport().holderName() << "\n"
+                  << "Срок действия до:    " << customer->passport().expiry().toString()
+                  << " (" << (!customer->passport().isExpiredOn(state.today) ? "Действителен" : "ПРОСРОЧЕН") << ")\n"
                   << "\n[ПРОГРАММА ЛОЯЛЬНОСТИ]:\n"
-                  << "Уровень карты:       " << c->loyalty().tier() << "\n"
-                  << "Накопленные баллы:   " << c->loyalty().points() << " pts\n"
-                  << "Сумма покупок:       " << c->loyalty().lifetimeSpent().toString() << "\n"
-                  << "Постоянная скидка:   " << c->loyalty().discountPercent() << "%\n";
+                  << "Уровень карты:       " << customer->loyalty().tier() << "\n"
+                  << "Накопленные баллы:   " << customer->loyalty().points() << " pts\n"
+                  << "Сумма покупок:       " << customer->loyalty().lifetimeSpent().toString() << "\n"
+                  << "Постоянная скидка:   " << customer->loyalty().discountPercent() << "%\n";
 
-        // Визы
         std::cout << "\n[ДЕЙСТВУЮЩИЕ ВИЗЫ]:\n";
-        if (c->visas().empty())
+        if (customer->visas().empty())
         {
             std::cout << "  Визы не оформлены.\n";
         }
         else
         {
-            for (const auto &v : c->visas())
+            for (const auto &visa : customer->visas())
             {
-                std::cout << "  • Страна: " << v.country() << ", тип: " << v.type()
-                          << ", период: " << v.validity().toString()
-                          << " (" << (v.isActiveOn(today) ? "Активна" : "Неактивна") << ")\n";
+                std::cout << "  • Страна: " << visa.country() << ", тип: " << visa.type()
+                          << ", период: " << visa.validity().toString()
+                          << " (" << (visa.isActiveOn(state.today) ? "Активна" : "Неактивна") << ")\n";
             }
         }
 
-        // Непрочитанные уведомления
-        std::size_t unread = agency.unreadNotifications(customerId);
-        std::cout << "\nНепрочитанных системных уведомлений: " << unread << "\n";
+        std::cout << "\nНепрочитанных системных уведомлений: "
+                  << state.agency->unreadNotifications(customerId) << "\n";
 
-        // Бронирования клиента
         std::cout << "\n[ИСТОРИЯ БРОНИРОВАНИЙ КЛИЕНТА]:\n";
         bool hasBookings = false;
-        for (const auto &b : agency.bookings())
+        for (const auto &booking : state.agency->bookings())
         {
-            if (b->customer()->customerId() == customerId)
+            if (booking->customer()->customerId() != customerId)
             {
-                hasBookings = true;
-                std::cout << "  • Бронь #" << b->id() << ": " << b->departure()->tour()->name()
-                          << " | Даты: " << b->departure()->period().toString()
-                          << " | Сумма: " << b->total().toString()
-                          << " | Статус: " << bookingStatusToStringRu(b->status()) << "\n";
+                continue;
             }
+            hasBookings = true;
+            std::cout << "  • Бронь #" << booking->id() << ": " << booking->departure()->tour()->name()
+                      << " | Даты: " << booking->departure()->period().toString()
+                      << " | Сумма: " << booking->total().toString()
+                      << " | Статус: " << bookingStatusToStringRu(booking->status()) << "\n";
         }
         if (!hasBookings)
         {
@@ -616,49 +1004,74 @@ namespace
         }
     }
 
-    void handleRegisterCustomer(TravelCompany &agency, const Date &today)
+    void handleRegisterCustomer(AppState &state)
     {
         printSectionHeader("РЕГИСТРАЦИЯ НОВОГО КЛИЕНТА");
-        int nextId = static_cast<int>(agency.customers().size()) + 1;
-        std::string first = prompt("Имя (First name)");
-        std::string last = prompt("Фамилия (Last name)");
-        int birthYear = promptInt("Год рождения", 1995);
-        std::string email = prompt("Email (напр., user@example.com)");
-        std::string phone = prompt("Телефон (напр., +7 999 123 45 67)");
-        std::string passNum = prompt("Номер паспорта (напр., P1234567)");
-
-        auto newCustomer = makeCustomer(nextId, first, last, birthYear, email, phone, passNum, today);
-        agency.registerCustomer(newCustomer);
-        std::cout << "\n[OK] Клиент успешно зарегистрирован под ID: " << nextId
-                  << " (" << newCustomer->fullName() << ")!\n";
+        const int customerId = static_cast<int>(state.agency->customers().size()) + 1;
+        const CustomerPtr customer = createCustomer(customerId, state.today);
+        state.agency->registerCustomer(customer);
+        std::cout << "\n[OK] Клиент зарегистрирован под ID: " << customerId
+                  << " (" << customer->fullName() << ").\n";
     }
 
-    void handleAddVisa(TravelCompany &agency, const Date &today)
+    void handleAddVisa(AppState &state)
     {
         printSectionHeader("ВЫДАЧА И ДОБАВЛЕНИЕ ВИЗЫ");
-        int customerId = promptInt("Введите ID клиента");
-        auto c = agency.findCustomer(customerId);
+        const int customerId = promptInt("Введите ID клиента");
+        const CustomerPtr customer = state.agency->findCustomer(customerId);
 
-        std::string countryCode = prompt("Код страны назначения (напр., IT, JP, AT, EG)");
-        std::string visaType = prompt("Тип/категория визы (напр., Tourist Type C)");
-        int durationDays = promptInt("Срок действия визы в днях", 90);
+        const std::string countryCode = prompt("Код страны назначения (напр., IT, JP, AT, EG)");
+        const std::string visaType = prompt("Тип/категория визы (напр., Tourist Type C)");
+        const int durationDays = promptInt("Срок действия визы в днях", 90);
 
-        DateRange validity(today, today.addDays(durationDays));
-        c->addVisa(Visa(countryCode, visaType, validity));
+        const DateRange validity(state.today, state.today.addDays(durationDays));
+        customer->addVisa(Visa(countryCode, visaType, validity));
         std::cout << "\n[OK] Виза в страну «" << countryCode << "» на срок "
-                  << validity.toString() << " успешно привязана к клиенту "
-                  << c->fullName() << "!\n";
+                  << validity.toString() << " привязана к клиенту " << customer->fullName() << ".\n";
     }
 
-    void handleCreateBooking(TravelCompany &agency, const Date &today)
+    void printCustomerChoices(const AppState &state)
+    {
+        std::cout << "\nКлиенты:\n";
+        for (const auto &customer : state.agency->customers())
+        {
+            std::cout << "  #" << customer->customerId() << " " << customer->fullName() << "\n";
+        }
+    }
+
+    void printDepartureChoices(const AppState &state)
+    {
+        std::cout << "\nОтправления:\n";
+        for (const auto &departure : state.agency->catalog().departures())
+        {
+            std::cout << "  #" << departure->id() << " " << departure->tour()->name()
+                      << " (" << departure->period().toString()
+                      << ", свободно мест: " << departure->freeSeats() << ")\n";
+        }
+    }
+
+    void handleCreateBooking(AppState &state)
     {
         printSectionHeader("СОЗДАНИЕ НОВОГО БРОНИРОВАНИЯ");
-        int customerId = promptInt("Введите ID клиента");
-        int departureId = promptInt("Введите ID отправления тура");
-        int participants = promptInt("Количество участников поездки", 1);
+        if (state.agency->customers().empty())
+        {
+            std::cout << "Сначала зарегистрируйте клиента (пункт 7 главного меню).\n";
+            return;
+        }
+        if (state.agency->catalog().departures().empty())
+        {
+            std::cout << "Сначала добавьте тур и отправление (пункты 22 и 23 главного меню).\n";
+            return;
+        }
 
-        auto booking = agency.createBooking(customerId, departureId, participants, today);
-        std::cout << "\n[OK] Бронирование #" << booking->id() << " успешно создано!\n"
+        printCustomerChoices(state);
+        printDepartureChoices(state);
+        const int customerId = promptInt("Введите ID клиента");
+        const int departureId = promptInt("Введите ID отправления");
+        const int participants = promptInt("Количество участников поездки", 1);
+
+        const BookingPtr booking = state.agency->createBooking(customerId, departureId, participants, state.today);
+        std::cout << "\n[OK] Бронирование #" << booking->id() << " создано.\n"
                   << "Тур:          " << booking->departure()->tour()->name() << "\n"
                   << "Даты поездки: " << booking->departure()->period().toString() << "\n"
                   << "Участников:   " << booking->participants() << " чел.\n"
@@ -666,249 +1079,244 @@ namespace
                   << "Статус:       " << bookingStatusToStringRu(booking->status()) << "\n";
     }
 
-    void handleBookingDetails(const TravelCompany &agency, Accountant &accountant, const Date &today)
+    void handleBookingDetails(const AppState &state)
     {
         printSectionHeader("ИНФОРМАЦИЯ О БРОНИРОВАНИИ И СЧЁТ");
-        int bookingId = promptInt("Введите ID бронирования");
-        auto b = agency.findBooking(bookingId);
+        const int bookingId = promptInt("Введите ID бронирования");
+        const BookingPtr booking = state.agency->findBooking(bookingId);
 
-        std::cout << "\n=== БРОНИРОВАНИЕ #" << b->id() << " ===\n"
-                  << "Дата оформления:  " << b->createdOn().toString() << "\n"
-                  << "Клиент:           #" << b->customer()->customerId() << " " << b->customer()->fullName()
-                  << " (" << b->customer()->contact().email() << ")\n"
-                  << "Тур:              " << b->departure()->tour()->name() << "\n"
-                  << "Направление:      " << b->departure()->tour()->destination().city().name() << "\n"
-                  << "Даты отправления: " << b->departure()->period().toString() << " ("
-                  << b->departure()->tour()->durationDays() << " дн.)\n"
-                  << "Количество мест:  " << b->participants() << " чел.\n"
-                  << "Текущий статус:   " << bookingStatusToStringRu(b->status()) << "\n"
+        std::cout << "\n=== БРОНИРОВАНИЕ #" << booking->id() << " ===\n"
+                  << "Дата оформления:  " << booking->createdOn().toString() << "\n"
+                  << "Клиент:           #" << booking->customer()->customerId() << " "
+                  << booking->customer()->fullName() << " (" << booking->customer()->contact().email() << ")\n"
+                  << "Тур:              " << booking->departure()->tour()->name() << "\n"
+                  << "Направление:      " << booking->departure()->tour()->destination().city().name() << "\n"
+                  << "Даты отправления: " << booking->departure()->period().toString() << " ("
+                  << booking->departure()->tour()->durationDays() << " дн.)\n"
+                  << "Количество мест:  " << booking->participants() << " чел.\n"
+                  << "Текущий статус:   " << bookingStatusToStringRu(booking->status()) << "\n"
                   << "\n[ФИНАНСОВЫЙ БАЛАНС]:\n"
-                  << "Итоговая сумма:   " << b->total().toString() << "\n"
-                  << "Оплачено:         " << b->totalPaid().toString() << "\n"
-                  << "Остаток к оплате: " << b->amountDue().toString() << "\n"
-                  << "Статус оплаты:    " << (b->isFullyPaid() ? "ПОЛНОСТЬЮ ОПЛАЧЕНО" : "ТРЕБУЕТСЯ ДОПЛАТА") << "\n";
+                  << "Итоговая сумма:   " << booking->total().toString() << "\n"
+                  << "Оплачено:         " << booking->totalPaid().toString() << "\n"
+                  << "Остаток к оплате: " << booking->amountDue().toString() << "\n"
+                  << "Статус оплаты:    " << (booking->isFullyPaid() ? "ПОЛНОСТЬЮ ОПЛАЧЕНО" : "ТРЕБУЕТСЯ ДОПЛАТА") << "\n";
 
-        // История оплат
         std::cout << "\n[ИСТОРИЯ ПЛАТЕЖЕЙ]:\n";
-        if (b->payments().empty())
+        if (booking->payments().empty())
         {
             std::cout << "  Платежи пока не поступали.\n";
         }
         else
         {
-            for (const auto &p : b->payments())
+            for (const auto &payment : booking->payments())
             {
-                std::cout << "  • Платёж #" << p.id() << " от " << p.date().toString()
-                          << " на сумму " << p.amount().toString()
-                          << " (способ: " << methodToString(p.method()) << ")\n";
+                std::cout << "  • Платёж #" << payment.id() << " от " << payment.date().toString()
+                          << " на сумму " << payment.amount().toString()
+                          << " (способ: " << methodToString(payment.method()) << ")\n";
             }
         }
 
-        // Страховой полис
         std::cout << "\n[СТРАХОВОЙ ПОЛИС]:\n";
-        if (b->insurance())
+        if (booking->insurance())
         {
-            const auto &ins = b->insurance();
-            std::cout << "  Номер полиса:   " << ins->policyNumber() << "\n"
-                      << "  Застрахованный: " << ins->insured()->fullName() << "\n"
-                      << "  Срок действия:  " << ins->period().toString() << "\n"
-                      << "  Лимит покрытия: " << ins->coverage().toString() << "\n"
-                      << "  Остаток лимита: " << ins->remainingCoverage().toString() << "\n"
-                      << "  Премия:         " << ins->premium().toString() << "\n";
+            const auto &insurance = booking->insurance();
+            std::cout << "  Номер полиса:   " << insurance->policyNumber() << "\n"
+                      << "  Застрахованный: " << insurance->insured()->fullName() << "\n"
+                      << "  Срок действия:  " << insurance->period().toString() << "\n"
+                      << "  Лимит покрытия: " << insurance->coverage().toString() << "\n"
+                      << "  Остаток лимита: " << insurance->remainingCoverage().toString() << "\n"
+                      << "  Премия:         " << insurance->premium().toString() << "\n";
         }
         else
         {
             std::cout << "  Страховой полис не оформлен.\n";
         }
 
-        // Официальный счёт (Invoice), сформированный бухгалтером
-        Invoice invoice = accountant.issueInvoice(b, today);
+        const Invoice invoice = state.accountant->issueInvoice(booking, state.today);
         std::cout << "\n[ОФИЦИАЛЬНЫЙ СЧЁТ БУХГАЛТЕРИИ (INVOICE)]:\n"
-                  << "  Номер счёта:     № " << invoice.number() << "\n"
-                  << "  Дата выставления:" << invoice.issueDate().toString() << "\n"
-                  << "  Оплатить до:     " << invoice.dueDate().toString()
-                  << " (" << (invoice.isOverdue(today) ? "ПРОСРОЧЕН" : "Действителен") << ")\n"
-                  << "  Сумма к оплате:  " << invoice.amountDue().toString() << "\n";
+                  << "  Номер счёта:      № " << invoice.number() << "\n"
+                  << "  Дата выставления: " << invoice.issueDate().toString() << "\n"
+                  << "  Оплатить до:      " << invoice.dueDate().toString()
+                  << " (" << (invoice.isOverdue(state.today) ? "ПРОСРОЧЕН" : "Действителен") << ")\n"
+                  << "  Сумма к оплате:   " << invoice.amountDue().toString() << "\n";
     }
 
-    void handlePayBooking(TravelCompany &agency, const Date &today)
+    void handlePayBooking(AppState &state)
     {
         printSectionHeader("ОПЛАТА БРОНИРОВАНИЯ");
-        int bookingId = promptInt("Введите ID бронирования");
-        auto b = agency.findBooking(bookingId);
+        const int bookingId = promptInt("Введите ID бронирования");
+        const BookingPtr booking = state.agency->findBooking(bookingId);
 
-        std::cout << "Текущий остаток к оплате по бронированию: " << b->amountDue().toString() << "\n";
-        if (b->isFullyPaid())
+        std::cout << "Текущий остаток к оплате: " << booking->amountDue().toString() << "\n";
+        if (booking->isFullyPaid())
         {
-            std::cout << "Бронирование уже полностью оплачено!\n";
+            std::cout << "Бронирование уже полностью оплачено.\n";
             return;
         }
 
-        int defaultUsd = static_cast<int>(b->amountDue().cents() / 100);
-        int payUsd = promptInt("Сумма платежа в USD (целое число)", defaultUsd);
-        Money amount(static_cast<long long>(payUsd) * 100);
+        const int defaultUsd = static_cast<int>(booking->amountDue().cents() / kCentsPerUsd);
+        const int payUsd = promptInt("Сумма платежа в USD (целое число)", defaultUsd);
+        const Money amount(static_cast<long long>(payUsd) * kCentsPerUsd);
 
         std::cout << "Выберите способ оплаты:\n"
                   << "  1. Банковская карта (Card)\n"
                   << "  2. Наличный расчёт в кассе (Cash)\n"
                   << "  3. Банковский перевод по реквизитам (BankTransfer)\n"
                   << "  4. Подарочный / туристический ваучер (Voucher)\n";
-        int methodChoice = promptInt("Способ (1..4)", 1);
-        PaymentMethod method = methodFromChoice(methodChoice);
+        const int methodChoice = promptInt("Способ (1..4)", 1);
+        const PaymentMethod method = methodFromChoice(methodChoice);
 
-        agency.payBooking(bookingId, amount, method, today);
+        state.agency->payBooking(bookingId, amount, method, state.today);
 
         std::cout << "\n[OK] Платёж на сумму " << amount.toString()
-                  << " способом «" << methodToString(method) << "» успешно проведён!\n"
-                  << "Оставшаяся задолженность: " << b->amountDue().toString() << "\n"
-                  << "Текущий статус: " << bookingStatusToStringRu(b->status()) << "\n";
+                  << " способом «" << methodToString(method) << "» проведён.\n"
+                  << "Оставшаяся задолженность: " << booking->amountDue().toString() << "\n"
+                  << "Текущий статус: " << bookingStatusToStringRu(booking->status()) << "\n";
 
-        if (b->isFullyPaid())
+        if (booking->isFullyPaid())
         {
-            std::cout << "\n>>> Поздравляем! Заказ полностью оплачен. Клиенту "
-                      << b->customer()->fullName() << " начислены баллы лояльности (всего: "
-                      << b->customer()->loyalty().points() << " pts, уровень: "
-                      << b->customer()->loyalty().tier() << ")!\n";
+            std::cout << "\n>>> Заказ полностью оплачен. Клиенту " << booking->customer()->fullName()
+                      << " начислены баллы лояльности (всего: " << booking->customer()->loyalty().points()
+                      << " pts, уровень: " << booking->customer()->loyalty().tier() << ").\n";
         }
     }
 
-    void handleAttachInsurance(TravelCompany &agency, const Date &today)
+    void handleAttachInsurance(AppState &state)
     {
         printSectionHeader("ОФОРМЛЕНИЕ СТРАХОВОГО ПОЛИСА");
-        int bookingId = promptInt("Введите ID бронирования");
-        auto b = agency.findBooking(bookingId);
+        const int bookingId = promptInt("Введите ID бронирования");
+        const BookingPtr booking = state.agency->findBooking(bookingId);
 
-        if (b->insurance())
+        if (booking->insurance())
         {
-            std::cout << "К данному бронированию уже прикреплён полис: "
-                      << b->insurance()->policyNumber() << "\n";
+            std::cout << "К бронированию уже прикреплён полис: " << booking->insurance()->policyNumber() << "\n";
             return;
         }
 
-        int coverageUsd = promptInt("Желаемый лимит страхового покрытия в USD", 50000);
-        Money coverage(static_cast<long long>(coverageUsd) * 100);
+        const int coverageUsd = promptInt("Желаемый лимит страхового покрытия, USD", 50000);
+        const Money coverage(static_cast<long long>(coverageUsd) * kCentsPerUsd);
+        const int age = booking->customer()->ageOn(state.today);
+        const Money premium = InsurancePolicy::premiumFor(booking->total(), age);
 
-        // Рассчитываем премию исходя из стоимости тура и возраста
-        int age = b->customer()->ageOn(today);
-        Money premium = InsurancePolicy::premiumFor(b->total(), age);
+        const std::string policyNumber = "POL-" + std::to_string(booking->id()) + "-" +
+                                         std::to_string(state.today.year());
+        const DateRange period = booking->departure()->period();
+        const auto policy = std::make_shared<InsurancePolicy>(policyNumber, booking->customer(),
+                                                              coverage, period, premium);
+        booking->attachInsurance(policy);
 
-        std::string policyNumber = "POL-" + std::to_string(b->id()) + "-" + std::to_string(today.year());
-        DateRange period = b->departure()->period();
-
-        auto policy = std::make_shared<InsurancePolicy>(policyNumber, b->customer(), coverage, period, premium);
-        b->attachInsurance(policy);
-
-        std::cout << "\n[OK] Страховой полис успешно оформлен и привязан к бронированию!\n"
-                  << "Номер полиса:    " << policyNumber << "\n"
-                  << "Застрахован:     " << b->customer()->fullName() << " (" << age << " лет)\n"
-                  << "Срок действия:   " << period.toString() << "\n"
-                  << "Сумма покрытия:  " << coverage.toString() << "\n"
-                  << "Страховая премия:" << premium.toString() << "\n";
+        std::cout << "\n[OK] Страховой полис оформлен и привязан к бронированию.\n"
+                  << "Номер полиса:     " << policyNumber << "\n"
+                  << "Застрахован:      " << booking->customer()->fullName() << " (" << age << " лет)\n"
+                  << "Срок действия:    " << period.toString() << "\n"
+                  << "Сумма покрытия:   " << coverage.toString() << "\n"
+                  << "Страховая премия: " << premium.toString() << "\n";
     }
 
-    void handleApplyDiscount(TravelCompany &agency, const Date &today)
+    void handleApplyDiscount(AppState &state)
     {
         printSectionHeader("ПРИМЕНЕНИЕ ПРОМОКОДА НА СКИДКУ");
-        int bookingId = promptInt("Введите ID бронирования");
-        auto b = agency.findBooking(bookingId);
-        std::cout << "Текущая сумма бронирования: " << b->total().toString() << "\n";
+        const int bookingId = promptInt("Введите ID бронирования");
+        const BookingPtr booking = state.agency->findBooking(bookingId);
+        std::cout << "Текущая сумма бронирования: " << booking->total().toString() << "\n";
 
-        std::string code = prompt("Введите промокод (напр., WELCOME10, SUMMER2026, VIP20)");
-        agency.applyDiscountCode(bookingId, code, today);
+        const std::string code = prompt("Введите промокод");
+        state.agency->applyDiscountCode(bookingId, code, state.today);
 
-        std::cout << "\n[OK] Промокод «" << code << "» успешно применён!\n"
-                  << "Новая сумма к оплате: " << b->total().toString() << "\n"
-                  << "Остаток к оплате:     " << b->amountDue().toString() << "\n";
+        std::cout << "\n[OK] Промокод «" << code << "» применён.\n"
+                  << "Новая сумма к оплате: " << booking->total().toString() << "\n"
+                  << "Остаток к оплате:     " << booking->amountDue().toString() << "\n";
     }
 
-    void handleCancelBooking(TravelCompany &agency, const Date &today)
+    void handleCancelBooking(AppState &state)
     {
         printSectionHeader("ОТМЕНА БРОНИРОВАНИЯ");
-        int bookingId = promptInt("Введите ID отменяемого бронирования");
-        auto b = agency.findBooking(bookingId);
+        const int bookingId = promptInt("Введите ID отменяемого бронирования");
+        const BookingPtr booking = state.agency->findBooking(bookingId);
 
-        std::cout << "Отмена брони #" << b->id() << " для клиента " << b->customer()->fullName() << "\n"
-                  << "Тур: " << b->departure()->tour()->name() << " (" << b->departure()->period().toString() << ")\n"
-                  << "Оплаченная сумма: " << b->totalPaid().toString() << "\n";
+        std::cout << "Отмена брони #" << booking->id() << " для клиента " << booking->customer()->fullName() << "\n"
+                  << "Тур: " << booking->departure()->tour()->name()
+                  << " (" << booking->departure()->period().toString() << ")\n"
+                  << "Оплаченная сумма: " << booking->totalPaid().toString() << "\n";
 
-        std::string confirm = prompt("Вы уверены, что хотите аннулировать заказ? (y/n)");
-        if (confirm != "y" && confirm != "Y" && confirm != "да" && confirm != "ДА")
+        const std::string confirmation = prompt("Вы уверены, что хотите аннулировать заказ? (y/n)");
+        if (confirmation != "y" && confirmation != "Y" && confirmation != "да" && confirmation != "ДА")
         {
             std::cout << "Отмена действия. Заказ остался без изменений.\n";
             return;
         }
 
-        Money refund = agency.cancelBooking(bookingId, today);
+        const Money refund = state.agency->cancelBooking(bookingId, state.today);
         std::cout << "\n[OK] Бронирование аннулировано.\n"
-                  << "Рассчитанная сумма возврата клиенту по правилам отмены: " << refund.toString() << "\n"
-                  << "Статус бронирования: " << bookingStatusToStringRu(b->status()) << "\n";
+                  << "Сумма возврата клиенту: " << refund.toString() << "\n"
+                  << "Статус бронирования:   " << bookingStatusToStringRu(booking->status()) << "\n";
     }
 
-    void handleReviews(TravelCompany &agency)
+    void handleAddReview(AppState &state)
     {
         printSectionHeader("ОТЗЫВЫ И РЕЙТИНГ ТУРОВ");
-        int customerId = promptInt("Введите ID клиента, оставляющего отзыв");
-        auto customer = agency.findCustomer(customerId);
-        int tourId = promptInt("Введите ID тура (1..5)");
-        auto tour = agency.catalog().findTour(tourId);
+        const int customerId = promptInt("Введите ID клиента, оставляющего отзыв");
+        const CustomerPtr customer = state.agency->findCustomer(customerId);
+        const int tourId = promptInt("Введите ID тура");
+        const TourPtr tour = state.agency->catalog().findTour(tourId);
 
-        int rating = promptInt("Оценка по шкале от 1 до 5", 5);
+        const int rating = promptInt("Оценка по шкале от 1 до 5", 5);
         if (rating < 1 || rating > 5)
         {
             std::cout << "Оценка должна быть в диапазоне от 1 до 5.\n";
             return;
         }
 
-        std::string comment = prompt("Текст отзыва / впечатления о поездке");
-        agency.addReview(Review(customer, tour, rating, comment));
+        const std::string comment = prompt("Текст отзыва / впечатления о поездке");
+        state.agency->addReview(Review(customer, tour, rating, comment));
 
-        double avgRating = agency.averageRating(tourId);
-        std::cout << "\n[OK] Благодарим за отзыв о туре «" << tour->name() << "»!\n"
-                  << "Ваша оценка: " << rating << " / 5. Текст: \"" << comment << "\"\n"
-                  << "Обновлённый средний рейтинг тура: "
-                  << std::to_string(avgRating).substr(0, 4) << " / 5.0\n";
+        const double averageRating = state.agency->averageRating(tourId);
+        std::cout << "\n[OK] Отзыв о туре «" << tour->name() << "» добавлен.\n"
+                  << "Оценка: " << rating << " / 5. Текст: \"" << comment << "\"\n"
+                  << "Обновлённый средний рейтинг: "
+                  << std::fixed << std::setprecision(1) << averageRating << " / 5.0\n"
+                  << std::defaultfloat;
     }
 
-    void handleFileComplaint(TravelCompany &agency)
+    void handleFileComplaint(const AppState &state)
     {
         printSectionHeader("РЕГИСТРАЦИЯ ЖАЛОБЫ КЛИЕНТА");
-        int customerId = promptInt("Введите ID клиента");
-        int bookingId = promptInt("Введите ID бронирования");
-        std::string text = prompt("Опишите суть претензии или проблемы");
+        const int customerId = promptInt("Введите ID клиента");
+        const int bookingId = promptInt("Введите ID бронирования");
+        const std::string text = prompt("Опишите суть претензии или проблемы");
 
-        int complaintId = agency.fileComplaint(customerId, bookingId, text);
-        std::cout << "\n[OK] Жалоба зарегистрирована под номером #" << complaintId << "!\n"
-                  << "Обращение передано в отдел контроля качества на рассмотрение руководителю.\n";
+        const int complaintId = state.agency->fileComplaint(customerId, bookingId, text);
+        std::cout << "\n[OK] Жалоба зарегистрирована под номером #" << complaintId << ".\n"
+                  << "Обращение передано в отдел контроля качества.\n";
     }
 
-    void handleResolveComplaint(TravelCompany &agency)
+    void handleResolveComplaint(const AppState &state)
     {
         printSectionHeader("РАССМОТРЕНИЕ И УРЕГУЛИРОВАНИЕ ЖАЛОБЫ");
-        std::cout << "Открытых нерассмотренных обращений: " << agency.openComplaintCount() << "\n";
-        int complaintId = promptInt("Введите ID рассматриваемой жалобы");
-        std::string resolution = prompt("Введите официальное решение / принятые меры по жалобе");
+        std::cout << "Открытых нерассмотренных обращений: " << state.agency->openComplaintCount() << "\n";
+        const int complaintId = promptInt("Введите ID рассматриваемой жалобы");
+        const std::string resolution = prompt("Введите официальное решение / принятые меры по жалобе");
 
-        agency.resolveComplaint(complaintId, resolution);
-        std::cout << "\n[OK] Жалоба #" << complaintId << " успешно урегулирована и закрыта!\n"
-                  << "Текст принятого решения зафиксирован в системе.\n";
+        state.agency->resolveComplaint(complaintId, resolution);
+        std::cout << "\n[OK] Жалоба #" << complaintId << " урегулирована и закрыта.\n";
     }
 
-    void handleComplaintStatus(const TravelCompany &agency)
+    void handleComplaintStatus(const AppState &state)
     {
         printSectionHeader("СТАТУС ОБРАЩЕНИЙ И ЖАЛОБ КЛИЕНТОВ");
-        std::size_t openCount = agency.openComplaintCount();
+        const std::size_t openCount = state.agency->openComplaintCount();
         std::cout << "Количество активных (нерешённых) жалоб: " << openCount << "\n";
         if (openCount == 0)
         {
-            std::cout << "Все поступившие обращения клиентов успешно обработаны и закрыты.\n";
+            std::cout << "Все поступившие обращения клиентов обработаны и закрыты.\n";
         }
         else
         {
-            std::cout << "Внимание: требуется урегулировать " << openCount << " жалоб(ы) через пункт меню 17.\n";
+            std::cout << "Требуется урегулировать жалоб через пункт 17: " << openCount << ".\n";
         }
     }
 
-    void handleSalesReport(const TravelCompany &agency, const Date &today)
+    void handleSalesReport(const AppState &state)
     {
         printSectionHeader("ФИНАНСОВЫЙ ОТЧЁТ О ПРОДАЖАХ (SALES REPORT)");
         std::cout << "Выберите временной период отчёта:\n"
@@ -916,223 +1324,332 @@ namespace
                   << "  2. За последние полгода (180 дней)\n"
                   << "  3. За последний год (365 дней)\n"
                   << "  4. За весь доступный диапазон (±1 год от текущей даты)\n";
-        int periodChoice = promptInt("Период (1..4)", 4);
+        const int periodChoice = promptInt("Период (1..4)", 4);
 
-        Date startDate = today.addDays(-365);
-        Date endDate = today.addDays(365);
+        Date startDate = state.today.addDays(-kDefaultReportDays);
+        Date endDate = state.today.addDays(kDefaultReportDays);
         std::string periodName = "Годовой отчёт";
 
         switch (periodChoice)
         {
         case 1:
-            startDate = today.addDays(-30);
-            endDate = today.addDays(30);
+            startDate = state.today.addDays(-30);
+            endDate = state.today.addDays(30);
             periodName = "Месячный отчёт";
             break;
         case 2:
-            startDate = today.addDays(-180);
-            endDate = today.addDays(180);
+            startDate = state.today.addDays(-180);
+            endDate = state.today.addDays(180);
             periodName = "Полугодовой отчёт";
             break;
         case 3:
-            startDate = today.addDays(-365);
-            endDate = today;
+            startDate = state.today.addDays(-kDefaultReportDays);
+            endDate = state.today;
             periodName = "Отчёт за прошедший год";
             break;
         default:
             break;
         }
 
-        SalesReport report = agency.generateReport(periodName, DateRange(startDate, endDate));
-
+        const SalesReport report = state.agency->generateReport(periodName, DateRange(startDate, endDate));
+        const std::string topTour = report.bookingCount() == 0 ? "" : report.topTourName();
         std::cout << "\n============================================================\n"
                   << "  " << report.title() << "\n"
-                  << "  Диапазон дат:       " << report.period().toString() << "\n"
+                  << "  Диапазон дат:        " << report.period().toString() << "\n"
                   << "============================================================\n"
-                  << "Всего бронирований:   " << report.bookingCount() << "\n"
-                  << "Аннулировано заказов: " << report.cancelledCount() << "\n"
-                  << "Суммарная выручка:    " << report.totalRevenue().toString() << "\n"
-                  << "Средний чек (чек/тур):" << report.averageBookingValue().toString() << "\n"
-                  << "Самый популярный тур: " << (report.topTourName().empty() ? "Нет данных" : report.topTourName()) << "\n"
+                  << "Всего бронирований:    " << report.bookingCount() << "\n"
+                  << "Аннулировано заказов:  " << report.cancelledCount() << "\n"
+                  << "Суммарная выручка:     " << report.totalRevenue().toString() << "\n"
+                  << "Средний чек:           " << report.averageBookingValue().toString() << "\n"
+                  << "Самый популярный тур:  " << (topTour.empty() ? "Нет данных" : topTour) << "\n"
                   << "============================================================\n";
     }
 
-    void handleLedger(const TravelCompany &agency, const Date &today)
+    void handleLedger(const AppState &state)
     {
         printSectionHeader("БУХГАЛТЕРСКАЯ КНИГА КОМПАНИИ (LEDGER)");
-        const auto &ledger = agency.ledger();
+        const Ledger &ledger = state.agency->ledger();
 
-        std::cout << "Финансовый журнал:    " << ledger.name() << "\n"
-                  << "Текущий нетто-баланс: " << ledger.balance().toString() << "\n"
-                  << "Общий доход (Income): " << ledger.totalIncome().toString() << "\n"
-                  << "Общие расходы/возврат:" << ledger.totalExpenses().toString() << "\n"
-                  << "Всего проводок:       " << ledger.entries().size() << "\n"
-                  << "Проводок за сегодня:  " << ledger.entriesOn(today) << "\n"
+        std::cout << "Финансовый журнал:     " << ledger.name() << "\n"
+                  << "Текущий нетто-баланс:  " << ledger.balance().toString() << "\n"
+                  << "Общий доход (Income):  " << ledger.totalIncome().toString() << "\n"
+                  << "Общие расходы/возврат: " << ledger.totalExpenses().toString() << "\n"
+                  << "Всего проводок:        " << ledger.entries().size() << "\n"
+                  << "Проводок за сегодня:   " << ledger.entriesOn(state.today) << "\n"
                   << "\n[ПОСЛЕДНИЕ ФИНАНСОВЫЕ ЗАПИСИ]:\n";
 
         if (ledger.entries().empty())
         {
             std::cout << "  В журнале пока нет проводок.\n";
+            return;
         }
-        else
+
+        for (const auto &entry : ledger.entries())
         {
-            for (const auto &entry : ledger.entries())
-            {
-                std::cout << "  • " << entry.describe()
-                          << (entry.income() ? "  [ДОХОД]" : "  [РАСХОД]") << "\n";
-            }
+            std::cout << "  • " << entry.describe()
+                      << (entry.income() ? "  [ДОХОД]" : "  [РАСХОД]") << "\n";
         }
     }
 
-    void handleOffices(const TravelCompany &agency)
+    void handleOffices(const AppState &state)
     {
         printSectionHeader("ОФИСЫ КОМПАНИИ И ШТАТ СОТРУДНИКОВ");
-        const auto &offices = agency.offices();
+        const auto &offices = state.agency->offices();
+        if (offices.empty())
+        {
+            std::cout << "Офисы пока не добавлены. Добавьте офис через пункт 25 главного меню.\n";
+            return;
+        }
 
         for (std::size_t i = 0; i < offices.size(); ++i)
         {
-            const auto &off = offices[i];
-            std::cout << "=== ОФИС #" << (i + 1) << ": " << off.name() << " ===\n"
-                      << "Адрес:               " << off.address().fullText() << "\n"
-                      << "Общий ФОТ офиса:     " << off.payroll().toString() << " в месяц\n"
-                      << "Штат сотрудников:    " << off.staffCount() << " чел.\n";
+            const Office &office = offices[i];
+            std::cout << "=== ОФИС #" << (i + 1) << ": " << office.name() << " ===\n"
+                      << "Адрес:            " << office.address().fullText() << "\n"
+                      << "Общий ФОТ офиса:  " << office.payroll().toString() << " в месяц\n"
+                      << "Штат сотрудников: " << office.staffCount() << " чел.\n";
 
-            if (off.manager())
+            if (office.manager())
             {
-                const auto &mgr = off.manager();
+                const auto &manager = office.manager();
                 std::cout << "\n  [РУКОВОДИТЕЛЬ ОФИСА]:\n"
-                          << "  ФИО:               " << mgr->fullName() << "\n"
-                          << "  Роль:              " << mgr->describeRole() << "\n"
-                          << "  Оклад:             " << mgr->salary().toString() << "\n"
-                          << "  Лимит скидки:      до " << mgr->discountLimitPercent() << "%\n"
-                          << "  Размер команды:    " << mgr->teamSize() << " чел.\n"
-                          << "  Зарплата команды:  " << mgr->teamPayroll().toString() << "\n";
+                          << "  ФИО:              " << manager->fullName() << "\n"
+                          << "  Роль:             " << manager->describeRole() << "\n"
+                          << "  Оклад:            " << manager->salary().toString() << "\n"
+                          << "  Лимит скидки:     до " << manager->discountLimitPercent() << "%\n"
+                          << "  Размер команды:   " << manager->teamSize() << " чел.\n"
+                          << "  Зарплата команды: " << manager->teamPayroll().toString() << "\n";
             }
 
             std::cout << "\n  [СОТРУДНИКИ ОФИСА]:\n";
-            for (const auto &emp : off.staff())
+            for (const auto &employee : office.staff())
             {
-                std::cout << "  • [#" << emp->employeeId() << "] " << emp->fullName()
-                          << " — " << emp->describeRole()
-                          << ", оклад: " << emp->salary().toString() << "\n";
+                std::cout << "  • [#" << employee->employeeId() << "] " << employee->fullName()
+                          << " — " << employee->describeRole()
+                          << ", оклад: " << employee->salary().toString() << "\n";
             }
             std::cout << "\n";
         }
     }
 
-} // namespace
-
-int main()
-{
-    const Date today = currentDate();
-    AppState state = buildDemoAgency(today);
-
-    while (std::cin)
+    void showSetupMenu()
     {
-        showMainMenu(state.agency, state.today);
+        printBanner("СОЗДАНИЕ ТУРИСТИЧЕСКОЙ КОМПАНИИ");
+        std::cout << "  1. Создать компанию (название, правила отмены, бухгалтер)\n"
+                  << "  0. Выход из программы\n";
+    }
 
-        int choice = -1;
+    void showMainMenu(const AppState &state)
+    {
+        const TravelCompany &company = *state.agency;
+        std::cout << "\nКомпания: " << company.name()
+                  << " | Дата: " << state.today.toString() << "\n"
+                  << "Туров: " << company.catalog().tours().size()
+                  << " | Отправлений: " << company.catalog().departures().size()
+                  << " | Клиентов: " << company.customers().size()
+                  << " | Бронирований: " << company.bookings().size() << "\n\n"
+                  << "   1. Список всех туров и доступных отправлений\n"
+                  << "   2. Поиск туров по городу назначения\n"
+                  << "   3. Подбор туров по максимальному бюджету\n"
+                  << "   4. Детальная программа тура\n"
+                  << "   5. Список зарегистрированных клиентов\n"
+                  << "   6. Карточка клиента\n"
+                  << "   7. Регистрация нового клиента\n"
+                  << "   8. Оформление / привязка визы клиенту\n"
+                  << "   9. Создать новое бронирование тура\n"
+                  << "  10. Детальная информация о бронировании и счёт-фактура\n"
+                  << "  11. Оплатить бронирование\n"
+                  << "  12. Оформить и прикрепить страховой полис\n"
+                  << "  13. Применить промокод на скидку\n"
+                  << "  14. Отменить бронирование с расчётом возврата\n"
+                  << "  15. Оставить отзыв о туре и посмотреть средний рейтинг\n"
+                  << "  16. Подать официальную жалобу по бронированию\n"
+                  << "  17. Рассмотреть жалобу\n"
+                  << "  18. Статус обращений и количество открытых жалоб\n"
+                  << "  19. Отчёт по продажам за период\n"
+                  << "  20. Финансовая книга компании Ledger\n"
+                  << "  21. Офисы компании, руководство и штат сотрудников\n"
+                  << "  22. Добавить тур\n"
+                  << "  23. Добавить отправление тура\n"
+                  << "  24. Добавить гида\n"
+                  << "  25. Добавить офис\n"
+                  << "  26. Добавить промокод на скидку\n"
+                  << "   0. Выход из программы\n";
+    }
+
+    int readChoice(int maxChoice)
+    {
         try
         {
-            choice = promptInt("Выберите пункт меню (0..21)");
+            const int choice = promptInt("Выберите пункт меню (0.." + std::to_string(maxChoice) + ")");
+            if (choice < 0 || choice > maxChoice)
+            {
+                std::cout << "\n[!] Пожалуйста, введите число от 0 до " << maxChoice << ".\n";
+                return kInvalidChoice;
+            }
+            return choice;
         }
         catch (const TravelException &)
         {
-            std::cout << "\n[!] Пожалуйста, введите корректное число от 0 до 21.\n";
-            continue;
+            std::cout << "\n[!] Пожалуйста, введите корректное число.\n";
+            return kInvalidChoice;
         }
-
-        if (choice == 0 || !std::cin)
-        {
-            std::cout << "\nЗавершение работы программы. До свидания!\n";
-            break;
-        }
-
-        try
-        {
-            switch (choice)
-            {
-            case 1:
-                handleListDepartures(state.agency);
-                break;
-            case 2:
-                handleSearchByCity(state.agency);
-                break;
-            case 3:
-                handleSearchByBudget(state.agency);
-                break;
-            case 4:
-                handleTourDetails(state.agency, state.today);
-                break;
-            case 5:
-                handleListCustomers(state.agency);
-                break;
-            case 6:
-                handleCustomerCard(state.agency, state.today);
-                break;
-            case 7:
-                handleRegisterCustomer(state.agency, state.today);
-                break;
-            case 8:
-                handleAddVisa(state.agency, state.today);
-                break;
-            case 9:
-                handleCreateBooking(state.agency, state.today);
-                break;
-            case 10:
-                handleBookingDetails(state.agency, *state.accountant, state.today);
-                break;
-            case 11:
-                handlePayBooking(state.agency, state.today);
-                break;
-            case 12:
-                handleAttachInsurance(state.agency, state.today);
-                break;
-            case 13:
-                handleApplyDiscount(state.agency, state.today);
-                break;
-            case 14:
-                handleCancelBooking(state.agency, state.today);
-                break;
-            case 15:
-                handleReviews(state.agency);
-                break;
-            case 16:
-                handleFileComplaint(state.agency);
-                break;
-            case 17:
-                handleResolveComplaint(state.agency);
-                break;
-            case 18:
-                handleComplaintStatus(state.agency);
-                break;
-            case 19:
-                handleSalesReport(state.agency, state.today);
-                break;
-            case 20:
-                handleLedger(state.agency, state.today);
-                break;
-            case 21:
-                handleOffices(state.agency);
-                break;
-            default:
-                std::cout << "\n[!] Неизвестная команда '" << choice << "'. Выберите число от 0 до 21.\n";
-                break;
-            }
-        }
-        catch (const TravelException &err)
-        {
-            std::cout << "\n[ОШИБКА ОПЕРАЦИИ]: " << err.what() << "\n";
-        }
-        catch (const std::exception &err)
-        {
-            std::cout << "\n[СИСТЕМНАЯ ОШИБКА]: " << err.what() << "\n";
-        }
-
-        std::cout << "\nНажмите Enter, чтобы вернуться в главное меню...";
-        std::string pause;
-        std::getline(std::cin, pause);
     }
 
+    template <typename Action>
+    void executeSafely(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (const TravelException &error)
+        {
+            std::cout << "\n[ОШИБКА ОПЕРАЦИИ]: " << error.what() << "\n";
+        }
+        catch (const std::exception &error)
+        {
+            std::cout << "\n[СИСТЕМНАЯ ОШИБКА]: " << error.what() << "\n";
+        }
+    }
+
+    void executeMainChoice(AppState &state, int choice)
+    {
+        switch (choice)
+        {
+        case 1:
+            handleShowCatalog(state);
+            break;
+        case 2:
+            handleSearchByCity(state);
+            break;
+        case 3:
+            handleSearchByBudget(state);
+            break;
+        case 4:
+            handleTourDetails(state);
+            break;
+        case 5:
+            handleListCustomers(state);
+            break;
+        case 6:
+            handleCustomerCard(state);
+            break;
+        case 7:
+            handleRegisterCustomer(state);
+            break;
+        case 8:
+            handleAddVisa(state);
+            break;
+        case 9:
+            handleCreateBooking(state);
+            break;
+        case 10:
+            handleBookingDetails(state);
+            break;
+        case 11:
+            handlePayBooking(state);
+            break;
+        case 12:
+            handleAttachInsurance(state);
+            break;
+        case 13:
+            handleApplyDiscount(state);
+            break;
+        case 14:
+            handleCancelBooking(state);
+            break;
+        case 15:
+            handleAddReview(state);
+            break;
+        case 16:
+            handleFileComplaint(state);
+            break;
+        case 17:
+            handleResolveComplaint(state);
+            break;
+        case 18:
+            handleComplaintStatus(state);
+            break;
+        case 19:
+            handleSalesReport(state);
+            break;
+        case 20:
+            handleLedger(state);
+            break;
+        case 21:
+            handleOffices(state);
+            break;
+        case 22:
+            handleAddTour(state);
+            break;
+        case 23:
+            handleAddDeparture(state);
+            break;
+        case 24:
+            handleAddGuide(state);
+            break;
+        case 25:
+            handleAddOffice(state);
+            break;
+        case 26:
+            handleAddDiscount(state);
+            break;
+        default:
+            std::cout << "\n[!] Неизвестная команда '" << choice << "'.\n";
+            break;
+        }
+    }
+
+    void runApplication()
+    {
+        AppState state(currentDate());
+        printBanner("ТУРИСТИЧЕСКАЯ КОМПАНИЯ — КОНСОЛЬНАЯ СИСТЕМА");
+
+        while (true)
+        {
+            if (!state.hasCompany())
+            {
+                showSetupMenu();
+                const int choice = readChoice(kMaxSetupChoice);
+                if (!std::cin || choice == kExitChoice)
+                {
+                    break;
+                }
+                if (choice == kCompanyChoice)
+                {
+                    executeSafely([&state]()
+                                  { handleCreateCompany(state); });
+                }
+                else if (choice != kInvalidChoice)
+                {
+                    std::cout << "\n[!] Неизвестная команда. Выберите 0 или 1.\n";
+                }
+                pause();
+                continue;
+            }
+
+            showMainMenu(state);
+            const int choice = readChoice(kMaxMainChoice);
+            if (!std::cin || choice == kExitChoice)
+            {
+                break;
+            }
+            if (choice != kInvalidChoice)
+            {
+                executeSafely([&state, choice]()
+                              { executeMainChoice(state, choice); });
+            }
+            pause();
+        }
+
+        std::cout << "\nЗавершение работы программы. До свидания!\n";
+    }
+
+}
+
+int main()
+{
+    runApplication();
     return 0;
 }

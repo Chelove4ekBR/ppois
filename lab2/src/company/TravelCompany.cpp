@@ -116,17 +116,17 @@ void TravelCompany::addReview(const Review &review)
 
 double TravelCompany::averageRating(int tourId) const
 {
-    int sum = 0;
-    int count = 0;
+    int totalRatingSum = 0;
+    int reviewCount = 0;
     for (const Review &review : reviews_)
     {
         if (review.tour()->id() == tourId)
         {
-            sum += review.rating();
-            ++count;
+            totalRatingSum += review.rating();
+            ++reviewCount;
         }
     }
-    return count == 0 ? 0.0 : static_cast<double>(sum) / count;
+    return reviewCount == 0 ? 0.0 : static_cast<double>(totalRatingSum) / reviewCount;
 }
 
 int TravelCompany::fileComplaint(int customerId, int bookingId, const std::string &text)

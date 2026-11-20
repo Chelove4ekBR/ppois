@@ -32,12 +32,12 @@ ContactInfo::ContactInfo(std::string email, std::string phone) : email_(std::mov
 }
 
 bool ContactInfo::isValidEmail(const std::string& email) {
-    const auto at = email.find('@');
-    if (at == std::string::npos || at == 0 || email.find('@', at + 1) != std::string::npos) {
+    const auto atPosition = email.find('@');
+    if (atPosition == std::string::npos || atPosition == 0 || email.find('@', atPosition + 1) != std::string::npos) {
         return false;
     }
-    const auto dot = email.find('.', at);
-    return dot != std::string::npos && dot > at + 1 && dot + 1 < email.size();
+    const auto dotPosition = email.find('.', atPosition);
+    return dotPosition != std::string::npos && dotPosition > atPosition + 1 && dotPosition + 1 < email.size();
 }
 
 bool ContactInfo::isValidPhone(const std::string& phone) {

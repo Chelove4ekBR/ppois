@@ -26,13 +26,13 @@ TEST_CASE("City labels and time zones", "[geo]") {
 }
 
 TEST_CASE("Airport validates code and direction", "[geo]") {
-    const Airport cai = support::airportIn("CAI", support::visaFreeCountry());
-    const Airport hrg = support::airportIn("HRG", support::visaFreeCountry());
-    const Airport kix = support::airportIn("KIX", support::visaCountry());
+    const Airport cairoAirport = support::airportIn("CAI", support::visaFreeCountry());
+    const Airport hurghadaAirport = support::airportIn("HRG", support::visaFreeCountry());
+    const Airport kansaiAirport = support::airportIn("KIX", support::visaCountry());
     CHECK_THROWS_AS(Airport("TOOLONG", "x", cairo()), TravelException);
-    CHECK_FALSE(cai.isInternationalTo(hrg));
-    CHECK(cai.isInternationalTo(kix));
-    CHECK(cai.label() == "CAI - CAI airport (CAI city)");
+    CHECK_FALSE(cairoAirport.isInternationalTo(hurghadaAirport));
+    CHECK(cairoAirport.isInternationalTo(kansaiAirport));
+    CHECK(cairoAirport.label() == "CAI - CAI airport (CAI city)");
 }
 
 TEST_CASE("Attraction costs", "[geo]") {

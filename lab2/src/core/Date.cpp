@@ -12,20 +12,20 @@ namespace
 
     long long dateToDayNumber(int year, unsigned month, unsigned day)
     {
-        int y = year;
-        int m = static_cast<int>(month);
-        int d = static_cast<int>(day);
+        int adjustedYear = year;
+        int adjustedMonth = static_cast<int>(month);
+        int adjustedDay = static_cast<int>(day);
 
-        if (m < 3)
+        if (adjustedMonth < 3)
         {
-            --y;
-            m += 12;
+            --adjustedYear;
+            adjustedMonth += 12;
         }
-        long long era = (y >= 0 ? y : y - 399) / 400;
-        int yoe = y - static_cast<int>(era * 400);
-        int doy = (153 * (m - 3) + 2) / 5 + d - 1;
-        int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-        long long ratadie = era * 146097LL + doe;
+        long long era = (adjustedYear >= 0 ? adjustedYear : adjustedYear - 399) / 400;
+        int yearOfEra = adjustedYear - static_cast<int>(era * 400);
+        int dayOfYear = (153 * (adjustedMonth - 3) + 2) / 5 + adjustedDay - 1;
+        int dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear;
+        long long ratadie = era * 146097LL + dayOfEra;
         return ratadie - 719163LL;
     }
 
@@ -34,16 +34,16 @@ namespace
 Date::Date(int year, unsigned month, unsigned day) : year_(year), month_(month), day_(day)
 {
 
-    struct tm t = {};
-    t.tm_year = year - 1900;
-    t.tm_mon = static_cast<int>(month) - 1;
-    t.tm_mday = static_cast<int>(day);
-    t.tm_isdst = -1;
-    time_t epoch = mktime(&t);
+    struct tm timeStruct = {};
+    timeStruct.tm_year = year - 1900;
+    timeStruct.tm_mon = static_cast<int>(month) - 1;
+    timeStruct.tm_mday = static_cast<int>(day);
+    timeStruct.tm_isdst = -1;
+    time_t epoch = mktime(&timeStruct);
     if (epoch == static_cast<time_t>(-1) ||
-        t.tm_year != year - 1900 ||
-        t.tm_mon != static_cast<int>(month) - 1 ||
-        t.tm_mday != static_cast<int>(day))
+        timeStruct.tm_year != year - 1900 ||
+        timeStruct.tm_mon != static_cast<int>(month) - 1 ||
+        timeStruct.tm_mday != static_cast<int>(day))
     {
         throw InvalidDateException("Invalid calendar date: " + std::to_string(year) + "-" +
                                    std::to_string(month) + "-" + std::to_string(day));
@@ -58,18 +58,18 @@ long long Date::dayNumber() const
 Date Date::fromDayNumber(long long dayNumber)
 {
 
-    long long z = dayNumber + 719163LL;
-    long long era = (z >= 0 ? z : z - 146096) / 146097;
-    int doe = static_cast<int>(z - era * 146097);
-    int yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    int y = yoe + static_cast<int>(era * 400);
-    int doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    int mp = (5 * doy + 2) / 153;
-    int d = doy - (153 * mp + 2) / 5 + 1;
-    int m = mp < 10 ? mp + 3 : mp - 9;
-    if (m <= 2)
-        ++y;
-    return Date(y, static_cast<unsigned>(m), static_cast<unsigned>(d));
+    long long daysSinceEpoch = dayNumber + 719163LL;
+    long long era = (daysSinceEpoch >= 0 ? daysSinceEpoch : daysSinceEpoch - 146096) / 146097;
+    int dayOfEra = static_cast<int>(daysSinceEpoch - era * 146097);
+    int yearOfEra = (dayOfEra - dayOfEra / 1460 + dayOfEra / 36524 - dayOfEra / 146096) / 365;
+    int calculatedYear = yearOfEra + static_cast<int>(era * 400);
+    int dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100);
+    int monthPosition = (5 * dayOfYear + 2) / 153;
+    int calculatedDay = dayOfYear - (153 * monthPosition + 2) / 5 + 1;
+    int calculatedMonth = monthPosition < 10 ? monthPosition + 3 : monthPosition - 9;
+    if (calculatedMonth <= 2)
+        ++calculatedYear;
+    return Date(calculatedYear, static_cast<unsigned>(calculatedMonth), static_cast<unsigned>(calculatedDay));
 }
 
 Date Date::addDays(int days) const
@@ -94,7 +94,7 @@ bool Date::isSameDay(const Date &other) const
 
 std::string Date::toString() const
 {
-    char buffer[kDateBufferSize];
-    std::snprintf(buffer, sizeof(buffer), "%04d-%02u-%02u", year_, month_, day_);
-    return buffer;
+    char formattedDate[kDateBufferSize];
+    std::snprintf(formattedDate, sizeof(formattedDate), "%04d-%02u-%02u", year_, month_, day_);
+    return formattedDate;
 }

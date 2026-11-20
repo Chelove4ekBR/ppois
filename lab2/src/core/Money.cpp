@@ -75,8 +75,8 @@ bool Money::isNegative() const
 std::string Money::toString() const
 {
     const long long absolute = std::llabs(cents_);
-    char buffer[kMoneyBufferSize];
-    std::snprintf(buffer, sizeof(buffer), "%s%lld.%02lld ", cents_ < 0 ? "-" : "", absolute / kCentsPerUnit,
+    char formattedAmount[kMoneyBufferSize];
+    std::snprintf(formattedAmount, sizeof(formattedAmount), "%s%lld.%02lld ", cents_ < 0 ? "-" : "", absolute / kCentsPerUnit,
                   absolute % kCentsPerUnit);
-    return std::string(buffer) + currency_;
+    return std::string(formattedAmount) + currency_;
 }

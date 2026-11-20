@@ -82,8 +82,8 @@ namespace support
         void addSkiTour(TravelCompany &agency)
         {
             const Country austria("Austria", "AT", "EUR", false);
-            const Tour ski = makeBaseTour({4, "Tyrol Ski Week", 6, 70000, 12}, City("Innsbruck", austria, 1));
-            agency.catalog().addTour(std::make_shared<SkiTour>(ski, "Axamer Lizum", Money(4000), 2));
+            const Tour skiTour = makeBaseTour({4, "Tyrol Ski Week", 6, 70000, 12}, City("Innsbruck", austria, 1));
+            agency.catalog().addTour(std::make_shared<SkiTour>(skiTour, "Axamer Lizum", Money(4000), 2));
         }
 
         void addKyotoTour(TravelCompany &agency, const TourGuidePtr &guide)

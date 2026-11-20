@@ -168,11 +168,11 @@ TEST_CASE("Booking insurance must belong to customer", "[booking]")
     DeparturePtr departure = agency.catalog().findDeparture(1);
     CustomerPtr customer = support::makeCustomer();
     const BookingPtr booking = std::make_shared<Booking>(1, customer, departure, 1, today());
-    const auto own = std::make_shared<InsurancePolicy>("P1", customer, usd(1), DateRange(today(), daysAfter(1)), usd(1));
-    const auto foreign = std::make_shared<InsurancePolicy>("P2", support::makeCustomer(2), usd(1), DateRange(today(), daysAfter(1)), usd(1));
-    booking->attachInsurance(own);
+    const auto ownPolicy = std::make_shared<InsurancePolicy>("P1", customer, usd(1), DateRange(today(), daysAfter(1)), usd(1));
+    const auto foreignPolicy = std::make_shared<InsurancePolicy>("P2", support::makeCustomer(2), usd(1), DateRange(today(), daysAfter(1)), usd(1));
+    booking->attachInsurance(ownPolicy);
     CHECK(booking->insurance()->policyNumber() == "P1");
-    CHECK_THROWS_AS(booking->attachInsurance(foreign), InsuranceException);
+    CHECK_THROWS_AS(booking->attachInsurance(foreignPolicy), InsuranceException);
 }
 
 TEST_CASE("Booking cancellation refunds according to policy", "[booking]")
